@@ -75,6 +75,38 @@ public sealed class ShelterAdoptionModule : IModule
             options.Schema.For<DogSurrenderRequest>().DatabaseSchemaName(SchemaName);
             options.Schema.For<FosterApplication>().DatabaseSchemaName(SchemaName);
             options.Schema.For<VolunteerApplication>().DatabaseSchemaName(SchemaName);
+
+            // PHASE 0 POC — DCB tag registration for
+            // ApproveApplicationHandler's modernized write boundary (see
+            // that file's own doc comment, and
+            // poc/DcbRewrite/NOTES.md in internal-modernization-accelerator
+            // for the full before/after story). Registered module-side,
+            // not centrally in Program.cs, since these tag types are
+            // ShelterAdoption-specific with no cross-module naming
+            // collision risk (unlike the event-store DatabaseSchemaName
+            // bug this file's own comment above already documents).
+            //
+            // KNOWN UNRESOLVED GAP (empirically confirmed against real
+            // Postgres, 2026-09-17): FetchForWritingByTags<ApproveApplicationDcbBoundary>
+            // throws at RUNTIME ("No source-generated dispatcher found ...
+            // there is no runtime fallback") even though this type has real
+            // Apply methods - Marten's compile-time source generator isn't
+            // picking it up as a self-aggregating type via ForAggregate<T>
+            // alone. Registering it via Projections.Snapshot<T> instead
+            // (the mechanism Application/DogListing use successfully)
+            // throws a DIFFERENT error at DocumentStore.For time
+            // (ArgumentNullException inside SingleStreamProjection<T>'s
+            // MakeGenericType call) - almost certainly because this type
+            // has no Id/identity property, which Snapshot<T> requires but
+            // a pure DCB boundary type conceptually shouldn't need. This
+            // is real, unresolved Marten 9.20.1 DCB setup friction (DCB
+            // shipped ~4 months before this session), not a mistake in
+            // this handler's business logic - see poc/DcbRewrite/NOTES.md
+            // for the full investigation trail before attempting a fix.
+            options.Events.RegisterTagType<Commands.ApproveApplication.ApplicationTag>("application")
+                .ForAggregate<Commands.ApproveApplication.ApproveApplicationDcbBoundary>();
+            options.Events.RegisterTagType<Commands.ApproveApplication.DogListingTag>("doglisting")
+                .ForAggregate<Commands.ApproveApplication.ApproveApplicationDcbBoundary>();
         }
     }
 }

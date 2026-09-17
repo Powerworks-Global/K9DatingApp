@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using FluentAssertions;
 using Marten;
+using JasperFx.Events;
+using JasperFx.Events.Tags;
 using Microsoft.AspNetCore.Http.HttpResults;
 using NSubstitute;
 using K9Crush.Modules.ShelterAdoption.Api.Commands.ApproveApplication;
@@ -10,10 +12,17 @@ using Xunit;
 namespace K9Crush.Modules.ShelterAdoption.Tests.Handlers;
 
 /// <summary>
-/// Layer 2 (TestingApproach.md) - ApproveApplicationHandler is a genuine
-/// two-stream write: FetchForWriting/AppendOne against both Application
-/// and (when it still exists) DogListing, plus a plain LoadAsync against
-/// ShelterAccount for the ownership check - ADR-031.
+/// Layer 2 (TestingApproach.md) - PHASE 0 POC UPDATE: ApproveApplicationHandler
+/// was rewritten to use a DCB (Dynamic Consistency Boundary) write boundary
+/// (session.Events.FetchForWritingByTags) instead of two independent
+/// FetchForWriting calls - see the handler's own doc comment and
+/// poc/DcbRewrite/NOTES.md (internal-modernization-accelerator repo).
+/// Business-decision reads now go through session.LoadAsync against the
+/// Inline snapshots directly (Application, DogListing, ShelterAccount are
+/// all already registered as such), so these tests mock LoadAsync for
+/// reads and mock the DCB boundary object for the write/AppendOne
+/// assertions - same business intent as the original tests, adapted to
+/// the new call shape, not gutted.
 /// </summary>
 public class ApproveApplicationHandlerTests
 {
@@ -23,15 +32,34 @@ public class ApproveApplicationHandlerTests
 
     private static IDocumentSession BuildSession(
         ShelterAccount shelterAccount, Application? application, DogListing? dogListing,
-        out JasperFx.Events.IEventStream<Application> applicationStream,
-        out JasperFx.Events.IEventStream<DogListing> dogListingStream)
+        out IEventBoundary<ApproveApplicationDcbBoundary> boundary)
     {
-        var session = MartenEventStoreTestHelpers.BuildSessionWithFetchForWriting(application?.Id ?? Guid.NewGuid(), application, out applicationStream);
-        session.LoadAsync<ShelterAccount>(shelterAccount.Id, Arg.Any<CancellationToken>()).Returns(shelterAccount);
+        var session = Substitute.For<IDocumentSession>();
+        var eventStore = Substitute.For<Marten.Events.IEventStoreOperations>();
+        session.Events.Returns(eventStore);
 
-        dogListingStream = Substitute.For<JasperFx.Events.IEventStream<DogListing>>();
-        dogListingStream.Aggregate.Returns(dogListing);
-        session.Events.FetchForWriting<DogListing>(DogListingId, Arg.Any<CancellationToken>()).Returns(Task.FromResult(dogListingStream));
+        session.LoadAsync<Application>(application?.Id ?? Guid.NewGuid(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(application));
+        session.LoadAsync<DogListing>(DogListingId, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(dogListing));
+        session.LoadAsync<ShelterAccount>(shelterAccount.Id, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<ShelterAccount?>(shelterAccount));
+
+        boundary = Substitute.For<IEventBoundary<ApproveApplicationDcbBoundary>>();
+        eventStore.FetchForWritingByTags<ApproveApplicationDcbBoundary>(Arg.Any<EventTagQuery>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(boundary));
+
+        // BuildEvent must return a real, working IEvent for WithTag/Data to
+        // operate on - a bare NSubstitute mock's Data/Tags default to null,
+        // which is fine here since these tests assert on the boundary's
+        // AppendOne calls (by wrapped event type), not on tag contents,
+        // which is Marten's own plumbing, not this handler's business logic.
+        eventStore.BuildEvent(Arg.Any<object>()).Returns(callInfo =>
+        {
+            var wrapped = Substitute.For<IEvent>();
+            wrapped.Data.Returns(callInfo.Arg<object>());
+            return wrapped;
+        });
 
         return session;
     }
@@ -46,7 +74,7 @@ public class ApproveApplicationHandlerTests
         var application = Application.SubmitNew(ApplicantOwnerId, DogListingId, shelterAccount.Id, TestIntake.Default).Application;
         application.Review();
 
-        var session = BuildSession(shelterAccount, application, null, out _, out _);
+        var session = BuildSession(shelterAccount, application, null, out _);
 
         var (result, integrationEvent) = await ApproveApplicationHandler.Handle(
             application.Id, BuildUser(Guid.NewGuid()), session, CancellationToken.None);
@@ -63,7 +91,7 @@ public class ApproveApplicationHandlerTests
         application.Review();
         var dogListing = DogListing.AddNew(shelterAccount.Id, "Biscuit", "Beagle mix", 24, "Friendly").DogListing;
 
-        var session = BuildSession(shelterAccount, application, dogListing, out var applicationStream, out var dogListingStream);
+        var session = BuildSession(shelterAccount, application, dogListing, out var boundary);
 
         var (result, integrationEvent) = await ApproveApplicationHandler.Handle(
             application.Id, BuildUser(ShelterOwnerId), session, CancellationToken.None);
@@ -72,8 +100,10 @@ public class ApproveApplicationHandlerTests
         application.Status.Should().Be(ApplicationStatus.Approved);
         dogListing.Status.Should().Be(DogListingStatus.Adopted, "v3 ENRICHMENT: approval cascades the listing's status");
 
-        applicationStream.Received(1).AppendOne(Arg.Is<object>(o => o != null && o.GetType() == typeof(K9Crush.Modules.ShelterAdoption.Domain.Events.ApplicationApprovalV1)));
-        dogListingStream.Received(1).AppendOne(Arg.Is<object>(o => o != null && o.GetType() == typeof(K9Crush.Modules.ShelterAdoption.Domain.Events.DogListingStatusUpdatedV1)));
+        // ONE combined boundary now gets both appends, instead of two
+        // independent per-stream streams (DCB modernization's whole point).
+        boundary.Received(1).AppendOne(Arg.Is<IEvent>(e => e != null && e.Data is K9Crush.Modules.ShelterAdoption.Domain.Events.ApplicationApprovalV1));
+        boundary.Received(1).AppendOne(Arg.Is<IEvent>(e => e != null && e.Data is K9Crush.Modules.ShelterAdoption.Domain.Events.DogListingStatusUpdatedV1));
         await session.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
 
         integrationEvent.Should().NotBeNull();
@@ -89,13 +119,13 @@ public class ApproveApplicationHandlerTests
         var application = Application.SubmitNew(ApplicantOwnerId, DogListingId, shelterAccount.Id, TestIntake.Default).Application;
         application.Review();
 
-        var session = BuildSession(shelterAccount, application, null, out _, out var dogListingStream);
+        var session = BuildSession(shelterAccount, application, null, out var boundary);
 
         var (result, integrationEvent) = await ApproveApplicationHandler.Handle(
             application.Id, BuildUser(ShelterOwnerId), session, CancellationToken.None);
 
         result.Result.Should().BeOfType<Ok<ApproveApplicationResponse>>();
         integrationEvent!.DogName.Should().BeEmpty();
-        dogListingStream.DidNotReceiveWithAnyArgs().AppendOne(default!);
+        boundary.DidNotReceive().AppendOne(Arg.Is<IEvent>(e => e != null && e.Data is K9Crush.Modules.ShelterAdoption.Domain.Events.DogListingStatusUpdatedV1));
     }
 }
