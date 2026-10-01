@@ -86,7 +86,7 @@
     <PackageVersion Include="MailKit" Version="4.17.0" />                               <!-- [verified against nuget.org's flat-container API directly] -->
 
     <!-- UI (Blazor.App) - ADR-029 -->
-    <PackageVersion Include="MudBlazor" Version="9.7.0" />                              <!-- [confirmed real - from dotnet add package's own restore, then reverted the CLI's file-wide reformat and re-added this one line by hand] -->
+    <PackageVersion Include="MudBlazor" Version="9.10.0" />                              <!-- [confirmed real - from dotnet add package's own restore, then reverted the CLI's file-wide reformat and re-added this one line by hand] -->
 
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />               <!-- [good-faith] -->
