@@ -130,7 +130,7 @@ jobs:
             type=raw,value=${{ needs.release.outputs.version }},enable=${{ needs.release.outputs.released == 'true' }}
 
       - name: Build and push gateway
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ env.SOLUTION_DIR }}
           file: ${{ env.SOLUTION_DIR }}/deploy/docker/Gateway.Dockerfile
@@ -151,7 +151,7 @@ jobs:
             type=raw,value=${{ needs.release.outputs.version }},enable=${{ needs.release.outputs.released == 'true' }}
 
       - name: Build and push api-host
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ env.SOLUTION_DIR }}
           file: ${{ env.SOLUTION_DIR }}/deploy/docker/ApiHost.Dockerfile
@@ -172,7 +172,7 @@ jobs:
             type=raw,value=${{ needs.release.outputs.version }},enable=${{ needs.release.outputs.released == 'true' }}
 
       - name: Build and push blazor-app
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ env.SOLUTION_DIR }}
           file: ${{ env.SOLUTION_DIR }}/deploy/docker/BlazorApp.Dockerfile
