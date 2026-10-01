@@ -93,7 +93,7 @@
     <PackageVersion Include="xunit" Version="2.9.3" />                                  <!-- [good-faith] -->
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />              <!-- [good-faith] -->
     <PackageVersion Include="FluentAssertions" Version="8.10.0" />                      <!-- [good-faith] -->
-    <PackageVersion Include="NSubstitute" Version="6.0.0" />                            <!-- [verified] mocking library - none was pinned yet; NSubstitute chosen over Moq for its no-Expression-tree call syntax, pairs well with async Marten interfaces (IDocumentSession/IQuerySession) -->
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />                            <!-- [verified] mocking library - none was pinned yet; NSubstitute chosen over Moq for its no-Expression-tree call syntax, pairs well with async Marten interfaces (IDocumentSession/IQuerySession) -->
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />                      <!-- [good-faith] -->
 
     <!-- Already a transitive dependency of NetArchTest.Rules (confirmed via its own
