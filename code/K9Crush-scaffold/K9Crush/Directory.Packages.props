@@ -24,8 +24,8 @@
     -->
 
     <!-- Persistence -->
-    <PackageVersion Include="Marten" Version="9.20.1" />                                <!-- [confirmed real - Dependabot PRs #24/#28, 2026-07-31] -->
-    <PackageVersion Include="Marten.AspNetCore" Version="9.20.1" />                     <!-- [confirmed real - Dependabot PR #24, 2026-07-31] -->
+    <PackageVersion Include="Marten" Version="9.27.0" />                                <!-- [confirmed real - Dependabot PRs #24/#28, 2026-07-31] -->
+    <PackageVersion Include="Marten.AspNetCore" Version="9.27.0" />                     <!-- [confirmed real - Dependabot PR #24, 2026-07-31] -->
 
     <!-- Messaging / Mediator - Wolverine packages release in lockstep,
          same version number across WolverineFx/.RabbitMQ/.Marten/.Http -
