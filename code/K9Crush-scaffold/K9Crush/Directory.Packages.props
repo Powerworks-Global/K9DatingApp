@@ -32,7 +32,7 @@
          this lockstep pattern is now confirmed real (Http/Marten both
          independently resolved to 6.17.2 in your restore log) -->
     <PackageVersion Include="WolverineFx" Version="6.40.0" />                           <!-- [confirmed real - Dependabot PRs #27/#29/#30, 2026-07-31] -->
-    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.23.1" />                  <!-- [confirmed real - Dependabot PR #29, 2026-07-31] -->
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.40.0" />                  <!-- [confirmed real - Dependabot PR #29, 2026-07-31] -->
     <PackageVersion Include="WolverineFx.Marten" Version="6.23.1" />                    <!-- [confirmed real - Dependabot PR #28, 2026-07-31] -->
     <PackageVersion Include="WolverineFx.Http" Version="6.23.1" />                      <!-- [confirmed real - Dependabot PR #27, 2026-07-31] -->
     <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.40.0" />        <!-- [confirmed real - Dependabot PR #30, 2026-07-31] Dev-time only - see Program.cs comment; production should move to pre-generated static codegen instead of shipping this -->
@@ -41,7 +41,7 @@
          because Program.cs registers RabbitMQ.Client.IConnection itself for
          the health check package - see the AddRabbitMQ() health check note
          below. -->
-    <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />                        <!-- [verified] -->
+    <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />                        <!-- [verified] -->
 
     <!-- Wolverine pulls MessagePack in transitively for envelope
          serialization. The version that comes along by default (2.5.108)
