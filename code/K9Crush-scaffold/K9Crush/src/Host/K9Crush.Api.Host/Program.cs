@@ -1,5 +1,7 @@
 using System.Reflection;
+using JasperFx;
 using Marten;
+using Weasel.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using K9Crush.BuildingBlocks.Domain;
@@ -63,30 +65,28 @@ builder.Services.AddMarten(options =>
     // module's name, since every module's events live here.
     options.Events.DatabaseSchemaName = "eventstore";
 
+    // ADR-037: explicit serialization defaults, since two of these are a
+    // one-way door once real events/documents exist (Casing.Default and
+    // System.Text.Json were already Marten's own defaults and didn't need
+    // setting; EnumStorage.AsString did - the untouched default is
+    // AsInteger, which silently makes stored data opaque/fragile to enum
+    // member reordering).
+    options.UseSystemTextJsonForSerialization(EnumStorage.AsString);
+
     options.ApplyModuleConfigurations(modules.Select(m => m.MartenConfiguration));
 
-    // NOTE: the explicit AutoCreateSchemaObjects assignment that used to
-    // be here (Development -> CreateOrUpdate, else -> None) has been
-    // removed rather than guessed at. Marten 9's "Critter Stack 2026"
-    // release restructured this exact setting as part of a broader
-    // "unified resource model" shared with Wolverine (search turned up
-    // references to CritterStackDefaults / ResourceAutoCreate / a new
-    // IServiceCollection.AddJasperFx() configuration surface, but not a
-    // definitive current namespace for the old Weasel.Core.AutoCreate
-    // enum specifically - guessing wrong here risks silently disabling
-    // schema creation rather than a compile error).
-    //
-    // What this means right now: Marten's own default is CreateOrUpdate
-    // (confirmed via its test suite), which is what Development needs -
-    // so local dev should work unchanged with no explicit setting.
-    // Before deploying anywhere beyond local dev, this needs deliberate
-    // configuration (likely via AddJasperFx() per the pattern above) so
-    // schema auto-creation is explicitly OFF outside Development - don't
-    // ship without resolving this. Your IDE's "go to definition" on
-    // AddJasperFx or CritterStackDefaults (once you add a `using JasperFx;`
-    // and start typing) will show you the actual current API against the
-    // exact package version that's actually installed, which is more
-    // reliable than what I can confirm from documentation alone.
+    // Confirmed via reflection against the installed Marten 9.20.1/JasperFx
+    // 2.36.2 packages: StoreOptions.AutoCreateSchemaObjects still exists,
+    // just retyped from the old Weasel.Core.AutoCreate enum to
+    // JasperFx.AutoCreate (same 4 values - All/CreateOrUpdate/CreateOnly/
+    // None) - the test fixtures (e.g. MediaPostgresFixture) already use
+    // this same property/enum successfully. Explicit per environment,
+    // matching ADR-033: Development gets schema auto-creation for fast
+    // local iteration; anywhere else, Marten must never alter schema at
+    // startup - a real migration step (not written yet) owns that instead.
+    options.AutoCreateSchemaObjects = builder.Environment.IsDevelopment()
+        ? AutoCreate.CreateOrUpdate
+        : AutoCreate.None;
 })
 // Wires Marten's transactional outbox/inbox with Wolverine. No
 // SubscribeToEvent<T> registrations needed right now - Discovery and

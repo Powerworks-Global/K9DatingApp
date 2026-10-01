@@ -10,6 +10,17 @@
 # directly in a terminal is untouched by this, by construction, not by
 # extra configuration.
 #
+# Scope, as of 2026-07-31: this hook only runs the checks that are cheap
+# regardless of how many times they fire — secret-scan (a grep) and the
+# stuck-loop guard (a hash compare). The solution-wide checks (dotnet
+# format --verify-no-changes / dotnet build / dotnet list package
+# --vulnerable) moved to orchestrate.mjs's runQualityGate(), which runs
+# them once per worktree at merge time instead of once per commit here.
+# Re-running a full solution build/format/vuln-scan on every single commit
+# attempt — across every parallel Ralph instance — was real, measured
+# throughput cost for no extra safety once a per-worktree gate exists
+# right before the code lands anyway.
+#
 # Contract: reads the PreToolUse JSON payload on stdin
 # ({"tool_name": "Bash", "tool_input": {"command": "..."}, ...}),
 # exits 0 to allow the tool call, exits 2 to block it (stderr is shown
@@ -52,10 +63,6 @@ block() {
   exit 2
 }
 
-find_sln() {
-  find . -maxdepth 2 \( -name "*.sln" -o -name "*.slnx" \) 2>/dev/null | head -1
-}
-
 # ============================================================
 # git commit path
 # ============================================================
@@ -83,30 +90,14 @@ is not a silent skip."
   fi
 
   # --- Normal commit: run the deterministic gate ---
+  # Just the secret scan here — dotnet format/build/vulnerable-package
+  # checks moved to orchestrate.mjs's per-worktree gate (see header comment
+  # above).
   FAILURES=""
 
   # 1. Secret scan over the staged diff
   if git diff --cached 2>/dev/null | grep -qEi "(api[_-]?key|secret|password|token)[[:space:]]*[:=][[:space:]]*['\"][^'\"]{8,}"; then
     FAILURES="${FAILURES}- Possible secret found in the staged diff (matched an api_key/secret/password/token pattern). Remove it and use a proper secrets manager (e.g. dotnet user-secrets locally, a real vault in any deployed environment) instead.\n"
-  fi
-
-  SLN=$(find_sln)
-  if [ -n "$SLN" ]; then
-    # 2. dotnet format (style/lint)
-    if ! dotnet format "$SLN" --verify-no-changes >/tmp/quality-gate-fmt.txt 2>&1; then
-      FAILURES="${FAILURES}- 'dotnet format --verify-no-changes' found unformatted code. Run 'dotnet format $SLN' and re-stage.\n"
-    fi
-
-    # 3. dotnet build
-    if ! dotnet build "$SLN" >/tmp/quality-gate-build.txt 2>&1; then
-      FAILURES="${FAILURES}- 'dotnet build' failed — see /tmp/quality-gate-build.txt for the full output.\n"
-    fi
-
-    # 4. Known-vulnerable NuGet packages
-    VULN_OUT=$(dotnet list "$SLN" package --vulnerable 2>&1 || true)
-    if printf '%s' "$VULN_OUT" | grep -qi "has the following vulnerable packages"; then
-      FAILURES="${FAILURES}- 'dotnet list package --vulnerable' found known-vulnerable NuGet packages — see /tmp/quality-gate-build.txt-equivalent output above, or re-run the command directly.\n"
-    fi
   fi
 
   if [ -n "$FAILURES" ]; then
@@ -119,8 +110,8 @@ genuine reason (bypasses are audited, see above).
 To bypass: GATE_BYPASS_REASON=\"...\" git commit --no-verify -m \"...\""
   fi
 
-  # Passed — append an audit-trail entry (evidence, not a skip-cache;
-  # this gate re-runs in full on every commit attempt).
+  # Passed — append an audit-trail entry (evidence, not a skip-cache; the
+  # secret-scan re-runs on every commit attempt, it's cheap enough to).
   TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
   DIFF_HASH=$(git diff --cached 2>/dev/null | hash_stdin)
   printf '{"timestamp":"%s","diffHash":"%s","status":"passed"}\n' "$TIMESTAMP" "$DIFF_HASH" >> "$GATE_HISTORY_FILE"

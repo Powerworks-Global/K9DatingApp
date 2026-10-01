@@ -7,14 +7,31 @@
 # Usage: docker compose -f deploy/compose/docker-compose.yml up -d
 #
 # NOTE: Postgres and object storage used to be here (Postgres+PostGIS and
-# MinIO containers). Both are superseded by ADR-024 - Postgres and Storage
-# are now Supabase-managed (external, no local container). Create a
-# Supabase project at https://supabase.com and put its connection details
-# into appsettings.Development.json - see GETTING_STARTED.md Step 2.
-# Auth was already Supabase-managed before that (ADR-005) - this just
-# extends the same external dependency to two more concerns.
+# MinIO containers), removed under ADR-024 in favor of Supabase-managed
+# infra. The `postgres` service below is a DELIBERATE, TEMPORARY reversal
+# of that decision for active slice build-out (fast local iteration, no
+# network dependency, easy to wipe/reset) - Supabase Storage and Auth
+# (ADR-005/024) are unaffected, only the ConnectionStrings:Postgres value.
+# Revert to Supabase-managed Postgres before this project ships - see
+# ADR-024 for the original reasoning that still applies at that point.
 
 services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_USER=k9crush
+      - POSTGRES_PASSWORD=k9crush
+      - POSTGRES_DB=k9crush
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U k9crush"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   rabbitmq:
     image: rabbitmq:3.13-management
     ports:
@@ -48,6 +65,10 @@ services:
       - "3000:3000"  # Grafana UI - http://localhost:3000 (admin/admin)
       - "4317:4317"  # OTLP gRPC
       - "4318:4318"  # OTLP HTTP
+    volumes:
+      # WS4.4: default alerts tied to CONSTITUTION.md's Tier C SLOs (C1, C2).
+      # Declared, not yet able to fire -- see the file's own header comment.
+      - ../observability/alerts.yml:/otel-lgtm/grafana/conf/provisioning/alerting/alerts.yml:ro
 
   # Fake SMTP server for local dev - Notifications sends real emails here
   # instead of a real provider (SendGrid/Postmark, per the Inventory doc)
@@ -58,3 +79,6 @@ services:
     ports:
       - "5080:80"    # Web UI - http://localhost:5080
       - "2525:25"    # SMTP - point Notifications' dev SMTP config here
+
+volumes:
+  postgres-data:

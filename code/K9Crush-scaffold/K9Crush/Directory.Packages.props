@@ -24,24 +24,24 @@
     -->
 
     <!-- Persistence -->
-    <PackageVersion Include="Marten" Version="9.20.1" />                                <!-- [confirmed real - Dependabot PRs #24/#28, 2026-07-31] -->
-    <PackageVersion Include="Marten.AspNetCore" Version="9.20.1" />                     <!-- [confirmed real - Dependabot PR #24, 2026-07-31] -->
+    <PackageVersion Include="Marten" Version="9.27.0" />                                <!-- [confirmed real - Dependabot PRs #24/#28, 2026-07-31] -->
+    <PackageVersion Include="Marten.AspNetCore" Version="9.27.0" />                     <!-- [confirmed real - Dependabot PR #24, 2026-07-31] -->
 
     <!-- Messaging / Mediator - Wolverine packages release in lockstep,
          same version number across WolverineFx/.RabbitMQ/.Marten/.Http -
          this lockstep pattern is now confirmed real (Http/Marten both
          independently resolved to 6.17.2 in your restore log) -->
-    <PackageVersion Include="WolverineFx" Version="6.25.5" />                           <!-- [confirmed real - Dependabot PRs #27/#29/#30, 2026-07-31] -->
-    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.23.1" />                  <!-- [confirmed real - Dependabot PR #29, 2026-07-31] -->
+    <PackageVersion Include="WolverineFx" Version="6.40.0" />                           <!-- [confirmed real - Dependabot PRs #27/#29/#30, 2026-07-31] -->
+    <PackageVersion Include="WolverineFx.RabbitMQ" Version="6.40.0" />                  <!-- [confirmed real - Dependabot PR #29, 2026-07-31] -->
     <PackageVersion Include="WolverineFx.Marten" Version="6.23.1" />                    <!-- [confirmed real - Dependabot PR #28, 2026-07-31] -->
     <PackageVersion Include="WolverineFx.Http" Version="6.25.5" />                      <!-- [confirmed real - Dependabot PR #27, 2026-07-31] -->
-    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.23.1" />        <!-- [confirmed real - Dependabot PR #30, 2026-07-31] Dev-time only - see Program.cs comment; production should move to pre-generated static codegen instead of shipping this -->
+    <PackageVersion Include="WolverineFx.RuntimeCompilation" Version="6.40.0" />        <!-- [confirmed real - Dependabot PR #30, 2026-07-31] Dev-time only - see Program.cs comment; production should move to pre-generated static codegen instead of shipping this -->
 
     <!-- Referenced directly (not just transitively via WolverineFx.RabbitMQ)
          because Program.cs registers RabbitMQ.Client.IConnection itself for
          the health check package - see the AddRabbitMQ() health check note
          below. -->
-    <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />                        <!-- [verified] -->
+    <PackageVersion Include="RabbitMQ.Client" Version="7.2.2" />                        <!-- [verified] -->
 
     <!-- Wolverine pulls MessagePack in transitively for envelope
          serialization. The version that comes along by default (2.5.108)
@@ -50,12 +50,12 @@
          decompression). Pinned explicitly here + referenced directly in
          Api.Host.csproj to force resolution to the patched version rather
          than silently carrying a vulnerable transitive dependency. -->
-    <PackageVersion Include="MessagePack" Version="2.5.301" />                          <!-- [verified - fixes GHSA-hv8m-jj95-wg3x and related] -->
+    <PackageVersion Include="MessagePack" Version="2.5.302" />                          <!-- [verified - fixes GHSA-hv8m-jj95-wg3x and related] -->
 
     <!-- Caching / Real-time -->
     <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />                   <!-- [good-faith] -->
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" /> <!-- [good-faith, inferred same release train as JwtBearer below] -->
-    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.9" /> <!-- [good-faith, inferred same release train] -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.11" /> <!-- [good-faith, inferred same release train] -->
 
     <!-- API / OpenAPI -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />                 <!-- [good-faith] -->
@@ -64,7 +64,7 @@
     <PackageVersion Include="Yarp.ReverseProxy" Version="2.3.0" />                      <!-- [verified] -->
 
     <!-- Auth -->
-    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.10" />      <!-- [verified] -->
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />      <!-- [verified] -->
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.9" />  <!-- [good-faith, ships in lockstep with JwtBearer from the same dotnet/aspnetcore repo] -->
 
     <!-- Observability -->
@@ -86,14 +86,14 @@
     <PackageVersion Include="MailKit" Version="4.17.0" />                               <!-- [verified against nuget.org's flat-container API directly] -->
 
     <!-- UI (Blazor.App) - ADR-029 -->
-    <PackageVersion Include="MudBlazor" Version="9.7.0" />                              <!-- [confirmed real - from dotnet add package's own restore, then reverted the CLI's file-wide reformat and re-added this one line by hand] -->
+    <PackageVersion Include="MudBlazor" Version="9.10.0" />                              <!-- [confirmed real - from dotnet add package's own restore, then reverted the CLI's file-wide reformat and re-added this one line by hand] -->
 
     <!-- Testing -->
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />               <!-- [good-faith] -->
     <PackageVersion Include="xunit" Version="2.9.3" />                                  <!-- [good-faith] -->
-    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />              <!-- [good-faith] -->
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />              <!-- [good-faith] -->
     <PackageVersion Include="FluentAssertions" Version="8.10.0" />                      <!-- [good-faith] -->
-    <PackageVersion Include="NSubstitute" Version="6.0.0" />                            <!-- [verified] mocking library - none was pinned yet; NSubstitute chosen over Moq for its no-Expression-tree call syntax, pairs well with async Marten interfaces (IDocumentSession/IQuerySession) -->
+    <PackageVersion Include="NSubstitute" Version="6.2.0" />                            <!-- [verified] mocking library - none was pinned yet; NSubstitute chosen over Moq for its no-Expression-tree call syntax, pairs well with async Marten interfaces (IDocumentSession/IQuerySession) -->
     <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />                      <!-- [good-faith] -->
 
     <!-- Already a transitive dependency of NetArchTest.Rules (confirmed via its own

@@ -3,6 +3,26 @@
 Patterns and gotchas discovered during task processing. Update this file
 whenever you encounter something reusable.
 
+## ArchitectureTests: cross-entity LoadAsync in a Commands/Automations handler
+
+`tests/K9Crush.ArchitectureTests/CommandStateFitnessTests.cs`
+(`CommandsAndAutomations_MustNotLoadOrQueryARegisteredSnapshotType`) IL-scans
+every `Commands/**`/`Automations/**` handler for `LoadAsync<T>`/`Query<T>`
+calls where `T` is in `SnapshotRegisteredTypeFullNames` (ADR-019/ADR-031: a
+handler must load its OWN mutation target live via
+`FetchForWriting`/`AggregateStreamAsync`, never `LoadAsync` a snapshot of the
+same type). A legitimate **read-only lookup of a DIFFERENT entity**
+(ownership checks, existence checks) still trips this scan purely because
+that other entity is also snapshot-registered — it must be added by name to
+`ReviewedCrossEntityLoadExceptions` (for `LoadAsync`) or
+`ReviewedCrossPopulationQueryExceptions` (for `Query`) with a one-line
+comment justifying it, or the build fails. Any new ShelterAdoption
+handler that does a cross-entity `LoadAsync` (e.g. dogId ->
+`DogListing.ShelterAccountId` -> `ShelterAccount` ownership check, the same
+shape as `UpdateListingStatusHandler`) needs this allowlist entry — check
+`dotnet test --filter FullyQualifiedName~K9Crush.ArchitectureTests` before
+assuming a slice is done, not just the slice's own test filter.
+
 ## tasks.json
 
 - Tasks are objects with `id`, `createdAt`, and `payload` (a `SliceChangedPayload`).
@@ -47,6 +67,9 @@ These files are refreshed on every poll (roughly every 15s while Ralph is runnin
 - Node events use `node:created`, `node:changed`, `node:deleted` — always POST to `/api/org/:orgId/boards/:boardId/nodes/events`.
 - Slice metadata (title, status) lives on the SLICE_BORDER node under `meta.sliceStatus` and `meta.title`.
 - `update-slice-status` rejects moving a slice into a status it's already in — this is a concurrency guard, not a bug. It means another agent already claimed the slice. Treat it as `ALREADY_IN_STATUS`, skip that slice, and move on to the next `Planned` one instead of erroring out.
+- On this board, `GET .../slicedata/slices` and the documented `GET .../slicedata?contextName=...&sliceId=...` detail endpoint are **not** useful for getting a slice's real fields/events/scenarios — the summary endpoint only ever returns `{id, title, status, sliceType}`, and the detail endpoint 404s with "No MODEL_CONTEXT node found" because this board has zero `MODEL_CONTEXT` nodes. The reliable path to full slice content: `GET .../nodes/:sliceBorderId` (its `node.data.colId` + `node.parentId` = the chapter), then `GET .../nodes/:chapterId` and read `meta.timelineData.{rows,cells}` — every cell whose `colId` matches the slice's own `colId` is one node of that slice (interaction row = COMMAND/READMODEL, swimlane row = EVENT, actor row = SCREEN, spec row = SCENARIO) — then `GET .../nodes/:nodeId` per id for `meta.title`/`meta.fields`/`meta.description`/`meta.givenWhenThenScenario`. Local `index.json`/`slice.json` on this board are correspondingly minimal stubs (same 4 fields) — don't expect `commands[]`/`events[]`/`specifications[]` arrays to already be populated there; always do the live node walk before implementing.
+- Local `index.json`'s `status` can be stale relative to the live board when multiple Ralph instances work the same board concurrently — always re-`GET .../nodes/:sliceId` and check `meta.sliceStatus` before claiming a slice that looks "Planned" locally; it may already be Blocked/InProgress/Done for real.
+- A `Done`-status task can arrive in `tasks.json` after the build already landed (e.g. a different Ralph instance, or this one on a prior iteration, completed and committed before this task was dequeued). Before writing up a "Done" task as a no-op summary, check `git log --oneline` for a matching `feat: <slice title>` commit — if found, just log it (no rebuild), don't treat it as evidence of missed work.
 
 ## .NET / Wolverine / Marten specifics — event-sourced only
 
@@ -129,3 +152,4 @@ The skills (`build-state-change` Step 5, `build-state-view` Step 6, README setup
   }
   ```
 - Live reference: `src/Host/<SolutionName>.Api.Host/Program.cs` and `src/BuildingBlocks/<SolutionName>.BuildingBlocks.Domain/` in your `<path-to-your-.NET-solution>/` solution.
+- When a handler resolves cross-entity ownership via a field on its own aggregate that's only populated once the aggregate reaches a specific status (e.g. a `ShelterAccountId` set only at `Accept`), the status guard must run *before* the ownership LoadAsync — otherwise a not-yet-eligible entity resolves ownership against a zero/default id and returns the wrong error (`Forbid` instead of `Conflict`). Order guards by data dependency, not by convention.

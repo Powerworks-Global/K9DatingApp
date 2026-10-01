@@ -1,0 +1,137 @@
+{
+  "_comment": "Frozen eval fixture. Originally ShelterAdoption-only (8 slices); extended 2026-09-08 with 4 Notifications-module slices per Corrective Project Plan WS1.1 — the 'ShelterAdoption only' scope constraint no longer applies now that this is the general K9crush harness rather than a module-scoped spike. See Active_Projects/K9crush/Orca Setup Brief.md §14 (Obsidian vault) for the original decision. Baseline tags: eval-shelteradoption-baseline-2026-09-07 (original 8), eval-k9crush-baseline-2026-09-08 (all 12, current). board id/orgId/token live in .eventmodelers/config.json, never in this file.",
+  "_originalCandidates": "10 board slices in the 'Shelter Reviews Application' chapter (6292bf02-c63c-47b7-acbf-333587e46c8b); 'Send Rejection Reason' and 'Send Approval Notification' were dropped from the original 8 for being cross-module Notifications automations — both re-added below now that the module-scope constraint is lifted.",
+  "slices": [
+    {
+      "folder": "GetPendingApplicationsQueue",
+      "boardId": "048a2df7-d7d8-4586-9f0d-8bfda66f583c",
+      "title": "Pending Applications Queue",
+      "sliceType": "STATE_VIEW",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/ReadModels/GetPendingApplicationsQueue",
+      "testFiles": [
+        "tests/K9Crush.IntegrationTests/ShelterAdoption/GetPendingApplicationsQueueIntegrationTests.cs"
+      ]
+    },
+    {
+      "folder": "RequestAdditionalDetails",
+      "boardId": "38400c60-cbaf-42dd-a0dc-a2428b26b252",
+      "title": "Request Additional Details",
+      "sliceType": "STATE_CHANGE",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/RequestAdditionalDetails",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/RequestAdditionalDetailsHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "MarkApplicationStale",
+      "boardId": "26067878-75b5-4d13-b85a-c462f8ba7f9e",
+      "title": "Mark Application Stale",
+      "sliceType": "STATE_CHANGE",
+      "sliceTypeNoteRealCode": "AUTOMATION in the actual codebase, despite board tag",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Automations/MarkApplicationStale",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/MarkApplicationStaleHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "CloseStaleApplication",
+      "boardId": "90bbc833-5f99-4048-8031-482e4a26ff96",
+      "title": "Close Stale Application",
+      "sliceType": "STATE_CHANGE",
+      "sliceTypeNoteRealCode": "AUTOMATION in the actual codebase, despite board tag",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Automations/CloseStaleApplication",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/CloseStaleApplicationHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "SubmitAdditionalDetails",
+      "boardId": "a0332d5a-6df4-4a6a-95ca-9e2d7201aada",
+      "title": "Submit Additional Details",
+      "sliceType": "STATE_CHANGE",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/SubmitAdditionalDetails",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/SubmitAdditionalDetailsHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "RejectApplication",
+      "boardId": "3f519bff-af4f-4156-bc58-0539c1d792e2",
+      "title": "Reject Application",
+      "sliceType": "STATE_CHANGE",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/RejectApplication",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/RejectApplicationHandlerTests.cs"
+      ],
+      "specificationsFile": "specifications/RejectApplication.json"
+    },
+    {
+      "folder": "ReviewApplication",
+      "boardId": "957ac88e-5220-469f-b2e6-27c664bf744d",
+      "title": "Review Application",
+      "sliceType": "STATE_CHANGE",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/ReviewApplication",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/ReviewApplicationHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "ApproveApplication",
+      "boardId": "35078eeb-7fef-4356-9c02-e5a5067c1293",
+      "title": "Approve Application",
+      "sliceType": "STATE_CHANGE",
+      "implDir": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/ApproveApplication",
+      "testFiles": [
+        "tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/ApproveApplicationHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "NotifyOnApplicationApproved",
+      "boardId": "a2a0c4dc-0ba5-45a1-88a1-58c8ab171231",
+      "title": "Send Approval Notification",
+      "sliceType": "AUTOMATION",
+      "boardStatus": "Done",
+      "verifiedOnBoard": "2026-09-08",
+      "implDir": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationApproved",
+      "testFiles": [
+        "tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationApprovedHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "NotifyOnApplicationRejected",
+      "boardId": "8e3fb083-c3d0-4812-aab4-9420a404e95a",
+      "title": "Send Rejection Reason",
+      "sliceType": "AUTOMATION",
+      "boardStatus": "Done",
+      "verifiedOnBoard": "2026-09-08",
+      "implDir": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationRejected",
+      "testFiles": [
+        "tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationRejectedHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "NotifyOnApplicationCancelled",
+      "boardId": "251daf4f-b154-4865-8fa0-def4eb39b88d",
+      "title": "Notify Applicants Of Cancellation",
+      "sliceType": "AUTOMATION",
+      "boardStatus": "Done",
+      "verifiedOnBoard": "2026-09-08",
+      "implDir": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationCancelled",
+      "testFiles": [
+        "tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationCancelledHandlerTests.cs"
+      ]
+    },
+    {
+      "folder": "NotifyOnApplicationListingChanged",
+      "boardId": "4ac6718d-5142-47ec-976d-f7959c90da3d",
+      "title": "Notify Applicant Of Listing Change",
+      "sliceType": "AUTOMATION",
+      "boardStatus": "Done",
+      "verifiedOnBoard": "2026-09-08",
+      "implDir": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationListingChanged",
+      "testFiles": [
+        "tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationListingChangedHandlerTests.cs"
+      ]
+    }
+  ]
+}

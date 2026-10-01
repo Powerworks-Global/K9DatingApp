@@ -1,0 +1,168 @@
+{
+  "_comment": "WS1.5 (Corrective Project Plan Sep 2026): the K9crush eval fixture's 12 frozen slices, expressed in the evals/evals.json convention (ACES / Agent Skills spec — see 'ACES (Agentic Continuous Evaluation of Skills)' in the Obsidian vault) so this suite composes with per-skill eval datasets under the same schema. `id` matches slices-manifest.json's `folder` field and results.jsonl's `slice_folder`, so a result row and its eval case can be joined directly. Derived from slices-manifest.json and AGENTS.md's 'Building a Slice' section (code/K9Crush-scaffold/K9Crush/AGENTS.md) — not invented.",
+  "_scoring_status": "Schema adoption only. run-slice.sh does not yet grade expected_behavior or expected_skill against a saved trajectory — it only records passed_mechanical/iterations_to_green/agent_final_status. Wiring an ACES-style grader against these entries is a separate, not-yet-scoped follow-on, not part of WS1.5.",
+  "_expected_skill_caveat": "load-slice normally runs first (AGENTS.md step 1) but is bypassed during an eval run by design: run-slice.sh hides .eventmodelers/config.json for the run's duration precisely so the agent can't reach the live board, and seeds .slices/default/ locally instead. The listed expected_skill values are the type-dispatch and status-update skills AGENTS.md names, which are exercised regardless of eval-mode.",
+  "evals": [
+    {
+      "id": "GetPendingApplicationsQueue",
+      "user_question": "Implement the 'Pending Applications Queue' slice per its definition in build-kit-dotnet/.slices/default/getpendingapplicationsqueue/slice.json, then mark it Done.",
+      "expected_skill": ["build-state-view", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~GetPendingApplicationsQueue\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/ReadModels/GetPendingApplicationsQueue at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.IntegrationTests/ShelterAdoption/GetPendingApplicationsQueueIntegrationTests.cs.",
+      "expected_behavior": [
+        "Determined this is a state-view slice from slice.json (projections/queries/readmodels present) and invoked build-state-view rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "RequestAdditionalDetails",
+      "user_question": "Implement the 'Request Additional Details' slice per its definition in build-kit-dotnet/.slices/default/requestadditionaldetails/slice.json, then mark it Done.",
+      "expected_skill": ["build-state-change", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~RequestAdditionalDetails\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/RequestAdditionalDetails at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/RequestAdditionalDetailsHandlerTests.cs.",
+      "expected_behavior": [
+        "Determined this is a state-change slice from slice.json (commands/events present, no processors) and invoked build-state-change rather than implementing manually",
+        "Followed build-state-change's document-store-vs-event-sourced choice and tests-first ordering rather than deviating",
+        "Every command field, event field, and specification in slice.json appears in the implementation — no invented business rules",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "MarkApplicationStale",
+      "user_question": "Implement the 'Mark Application Stale' slice per its definition in build-kit-dotnet/.slices/default/markapplicationstale/slice.json, then mark it Done.",
+      "expected_skill": ["build-automation", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~MarkApplicationStale\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Automations/MarkApplicationStale at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/MarkApplicationStaleHandlerTests.cs. Board tags this STATE_CHANGE but the real code is an Automation (slices-manifest.json's sliceTypeNoteRealCode) — expected_skill follows the real code, not the board label.",
+      "expected_behavior": [
+        "Determined this is an automation from slice.json's processors (not the board's STATE_CHANGE label) and invoked build-automation rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "CloseStaleApplication",
+      "user_question": "Implement the 'Close Stale Application' slice per its definition in build-kit-dotnet/.slices/default/closestaleapplication/slice.json, then mark it Done.",
+      "expected_skill": ["build-automation", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~CloseStaleApplication\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Automations/CloseStaleApplication at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/CloseStaleApplicationHandlerTests.cs. Board tags this STATE_CHANGE but the real code is an Automation (slices-manifest.json's sliceTypeNoteRealCode) — expected_skill follows the real code, not the board label.",
+      "expected_behavior": [
+        "Determined this is an automation from slice.json's processors (not the board's STATE_CHANGE label) and invoked build-automation rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "SubmitAdditionalDetails",
+      "user_question": "Implement the 'Submit Additional Details' slice per its definition in build-kit-dotnet/.slices/default/submitadditionaldetails/slice.json, then mark it Done.",
+      "expected_skill": ["build-state-change", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~SubmitAdditionalDetails\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/SubmitAdditionalDetails at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/SubmitAdditionalDetailsHandlerTests.cs.",
+      "expected_behavior": [
+        "Determined this is a state-change slice from slice.json (commands/events present, no processors) and invoked build-state-change rather than implementing manually",
+        "Followed build-state-change's document-store-vs-event-sourced choice and tests-first ordering rather than deviating",
+        "Every command field, event field, and specification in slice.json appears in the implementation — no invented business rules",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "RejectApplication",
+      "user_question": "Implement the 'Reject Application' slice per its definition in build-kit-dotnet/.slices/default/rejectapplication/slice.json, then mark it Done.",
+      "expected_skill": ["build-state-change", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~RejectApplication\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/RejectApplication at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/RejectApplicationHandlerTests.cs. Two real WS1.4 baseline comparisons already recorded against this exact slice (Claude Code vs. Pi, Sonnet pinned both sides) — see results.jsonl.",
+      "expected_behavior": [
+        "Determined this is a state-change slice from slice.json (commands/events present, no processors) and invoked build-state-change rather than implementing manually",
+        "Followed build-state-change's document-store-vs-event-sourced choice and tests-first ordering rather than deviating",
+        "Every command field, event field, and specification in slice.json appears in the implementation — no invented business rules",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "ReviewApplication",
+      "user_question": "Implement the 'Review Application' slice per its definition in build-kit-dotnet/.slices/default/reviewapplication/slice.json, then mark it Done.",
+      "expected_skill": ["build-state-change", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~ReviewApplication\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/ReviewApplication at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/ReviewApplicationHandlerTests.cs. First slice smoke-tested when the 8-slice harness was proven (all 8/8 passed_mechanical, iterations_to_green=1).",
+      "expected_behavior": [
+        "Determined this is a state-change slice from slice.json (commands/events present, no processors) and invoked build-state-change rather than implementing manually",
+        "Followed build-state-change's document-store-vs-event-sourced choice and tests-first ordering rather than deviating",
+        "Every command field, event field, and specification in slice.json appears in the implementation — no invented business rules",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "ApproveApplication",
+      "user_question": "Implement the 'Approve Application' slice per its definition in build-kit-dotnet/.slices/default/approveapplication/slice.json, then mark it Done.",
+      "expected_skill": ["build-state-change", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~ApproveApplication\"",
+      "ground_truth": "src/Modules/ShelterAdoption/K9Crush.Modules.ShelterAdoption.Api/Commands/ApproveApplication at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.ShelterAdoption.Tests/Handlers/ApproveApplicationHandlerTests.cs.",
+      "expected_behavior": [
+        "Determined this is a state-change slice from slice.json (commands/events present, no processors) and invoked build-state-change rather than implementing manually",
+        "Followed build-state-change's document-store-vs-event-sourced choice and tests-first ordering rather than deviating",
+        "Every command field, event field, and specification in slice.json appears in the implementation — no invented business rules",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "NotifyOnApplicationApproved",
+      "user_question": "Implement the 'Send Approval Notification' slice per its definition in build-kit-dotnet/.slices/default/notifyonapplicationapproved/slice.json, then mark it Done.",
+      "expected_skill": ["build-automation", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~NotifyOnApplicationApproved\"",
+      "ground_truth": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationApproved at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationApprovedHandlerTests.cs. Added 2026-09-08 (WS1.1 extension, previously excluded for being cross-module); verified Done on the live board 2026-09-08.",
+      "expected_behavior": [
+        "Determined this is an automation from slice.json's non-empty processors and invoked build-automation rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "NotifyOnApplicationRejected",
+      "user_question": "Implement the 'Send Rejection Reason' slice per its definition in build-kit-dotnet/.slices/default/notifyonapplicationrejected/slice.json, then mark it Done.",
+      "expected_skill": ["build-automation", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~NotifyOnApplicationRejected\"",
+      "ground_truth": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationRejected at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationRejectedHandlerTests.cs. Added 2026-09-08 (WS1.1 extension, previously excluded for being cross-module); verified Done on the live board 2026-09-08.",
+      "expected_behavior": [
+        "Determined this is an automation from slice.json's non-empty processors and invoked build-automation rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "NotifyOnApplicationCancelled",
+      "user_question": "Implement the 'Notify Applicants Of Cancellation' slice per its definition in build-kit-dotnet/.slices/default/notifyonapplicationcancelled/slice.json, then mark it Done.",
+      "expected_skill": ["build-automation", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~NotifyOnApplicationCancelled\"",
+      "ground_truth": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationCancelled at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationCancelledHandlerTests.cs. Added 2026-09-08 (WS1.1 extension); verified Done on the live board 2026-09-08.",
+      "expected_behavior": [
+        "Determined this is an automation from slice.json's non-empty processors and invoked build-automation rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    },
+    {
+      "id": "NotifyOnApplicationListingChanged",
+      "user_question": "Implement the 'Notify Applicant Of Listing Change' slice per its definition in build-kit-dotnet/.slices/default/notifyonapplicationlistingchanged/slice.json, then mark it Done.",
+      "expected_skill": ["build-automation", "update-slice-status"],
+      "expected_script": "dotnet build code/K9Crush-scaffold/K9Crush/K9Crush.sln && dotnet test code/K9Crush-scaffold/K9Crush/K9Crush.sln --filter \"FullyQualifiedName~NotifyOnApplicationListingChanged\"",
+      "ground_truth": "src/Modules/Notifications/K9Crush.Modules.Notifications.Api/Automations/NotifyOnApplicationListingChanged at the eval-k9crush-baseline-2026-09-08 tag; test at tests/K9Crush.Modules.Notifications.Tests/Handlers/NotifyOnApplicationListingChangedHandlerTests.cs. Added 2026-09-08 (WS1.1 extension); verified Done on the live board 2026-09-08.",
+      "expected_behavior": [
+        "Determined this is an automation from slice.json's non-empty processors and invoked build-automation rather than implementing manually",
+        "Every field and specification in the implementation traces back to slice.json — nothing invented",
+        "Ran dotnet build and the slice-filtered dotnet test before considering the slice complete",
+        "Set the local slice status to Done only after build and tests passed"
+      ]
+    }
+  ]
+}

@@ -4,10 +4,34 @@ name: CD
 # avoids deploying a commit CI hasn't actually passed for). Cuts a semver
 # release from Conventional Commits since the last one (if any commit
 # since then warrants it), builds the 3 app images tagged with sha/latest/
-# (optionally) that version, pushes to GHCR, then SSHes into the Hetzner
-# MVP box (ADR-025) to pull and restart. See
-# docs/03-solution-architecture.md section 7.1 for the target this
-# implements.
+# (optionally) that version, pushes to Artifact Registry, then deploys
+# each to Cloud Run (project k9crush-prod, region europe-west1) via
+# Workload Identity Federation - no long-lived service-account key in
+# repo secrets. RabbitMQ/Redis/Postgres run on a small internal
+# Compute Engine VM (k9crush-broker, no public IP), reached over a
+# Serverless VPC Access connector (k9crush-connector).
+#
+# Retargeted from the original Hetzner SSH deploy (ADR-025) on 2026-09-11
+# -- confirmed via `gh run list --workflow=cd.yml` that the Hetzner path
+# had zero runs ever (no HETZNER_* secrets, no "production" environment
+# existed either), so this was a clean rewrite of a never-triggered job,
+# not a cutover from a live system. ADR-025 is now stale/superseded, not
+# describing anything real.
+#
+# Known, deliberately deferred gaps (not hidden): (1) Supabase:Url and
+# Supabase__Url/AnonKey are non-functional placeholders
+# (non-functional-placeholder.invalid) -- real auth needs the Authentik
+# swap (Program.cs's JWT validation is hardcoded to Supabase's specific
+# Authority path/audience/claim shape today), scoped as its own follow-up
+# task, not done here. (2) gateway's own outbound YARP-proxied requests
+# to api-host/blazor-app don't carry a Google identity token, so a
+# request through the public gateway URL currently 401s even though both
+# backend services work correctly when reached directly -- needs
+# explicit token-forwarding code in the Gateway project, also deferred.
+# (3) The GCP org's iam.allowedPolicyMemberDomains policy blocks allUsers
+# IAM bindings entirely, so all 3 Cloud Run services require an
+# authenticated Google identity to reach at all right now -- acceptable
+# for a non-prod/demo environment, revisit once auth is real.
 on:
   workflow_run:
     workflows: ["CI"]
@@ -15,9 +39,15 @@ on:
     branches: [main]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  REGISTRY: europe-west1-docker.pkg.dev
+  IMAGE_NAMESPACE: k9crush-prod/k9crush
   SOLUTION_DIR: code/K9Crush-scaffold/K9Crush
+  GCP_PROJECT: k9crush-prod
+  GCP_REGION: europe-west1
+  WIF_PROVIDER: projects/1027616718366/locations/global/workloadIdentityPools/github-actions/providers/github
+  DEPLOYER_SA: github-actions-deployer@k9crush-prod.iam.gserviceaccount.com
+  RUNTIME_SA: k9crush-runtime@k9crush-prod.iam.gserviceaccount.com
+  VPC_CONNECTOR: k9crush-connector
 
 jobs:
   release:
@@ -58,7 +88,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write
     outputs:
       image-tag: ${{ github.event.workflow_run.head_sha }}
     steps:
@@ -70,12 +100,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - id: auth
+        name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/1027616718366/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: ${{ env.DEPLOYER_SA }}
+          token_format: access_token
+
+      - name: Log in to Artifact Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
 
       # One metadata block per image: always tags with the commit sha and
       # `latest`, plus the semver from the release job - but only when
@@ -85,7 +123,7 @@ jobs:
         id: meta-gateway
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/k9crush-gateway
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/gateway
           tags: |
             type=raw,value=${{ github.event.workflow_run.head_sha }}
             type=raw,value=latest
@@ -106,7 +144,7 @@ jobs:
         id: meta-api-host
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/k9crush-api-host
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/api-host
           tags: |
             type=raw,value=${{ github.event.workflow_run.head_sha }}
             type=raw,value=latest
@@ -127,7 +165,7 @@ jobs:
         id: meta-blazor-app
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/k9crush-blazor-app
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/blazor-app
           tags: |
             type=raw,value=${{ github.event.workflow_run.head_sha }}
             type=raw,value=latest
@@ -147,41 +185,47 @@ jobs:
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-    # GitHub Environment "production" - set this up with the 3 secrets
-    # referenced below, and optionally a required reviewer for a manual
-    # approval gate before anything touches the box. See PR/commit
-    # description for the one-time VPS setup this assumes.
+    # GitHub Environment "production" - not yet created (see header comment:
+    # the original Hetzner deploy never ran, so this environment never
+    # existed either). Create it before this job can run for real, with
+    # the GCP project id below and optionally a required reviewer as a
+    # manual approval gate.
     environment: production
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - id: auth
+        name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v3
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          workload_identity_provider: projects/1027616718366/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: ${{ env.DEPLOYER_SA }}
 
-      # Keeps the box's copy of these two files in sync with what's in
-      # git on every deploy - .env (with real secrets/DOMAIN) is created
-      # once by hand on the box per .env.example and is deliberately not
-      # touched here.
-      - name: Copy compose files to the box
-        uses: appleboy/scp-action@v1
+      # api-host and blazor-app carry known, deliberately-deferred
+      # placeholders (Supabase auth, see header comment) - not
+      # re-supplied here on every deploy since they're already set on
+      # the services and this step only needs to update the image.
+      - name: Deploy gateway
+        uses: google-github-actions/deploy-cloudrun@v3
         with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          source: "${{ env.SOLUTION_DIR }}/deploy/compose/docker-compose.prod.yml,${{ env.SOLUTION_DIR }}/deploy/compose/Caddyfile"
-          target: "~/k9crush"
-          strip_components: 5
+          service: gateway
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ env.GCP_PROJECT }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/gateway:${{ needs.build-and-push.outputs.image-tag }}
 
-      - name: Pull new images and restart
-        uses: appleboy/ssh-action@v1
+      - name: Deploy api-host
+        uses: google-github-actions/deploy-cloudrun@v3
         with:
-          host: ${{ secrets.HETZNER_HOST }}
-          username: ${{ secrets.HETZNER_USER }}
-          key: ${{ secrets.HETZNER_SSH_KEY }}
-          script: |
-            set -e
-            cd ~/k9crush
-            export IMAGE_TAG=${{ needs.build-and-push.outputs.image-tag }}
-            docker compose -f docker-compose.prod.yml --env-file .env pull gateway api-host blazor-app
-            docker compose -f docker-compose.prod.yml --env-file .env up -d
-            docker image prune -f
+          service: api-host
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ env.GCP_PROJECT }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/api-host:${{ needs.build-and-push.outputs.image-tag }}
+
+      - name: Deploy blazor-app
+        uses: google-github-actions/deploy-cloudrun@v3
+        with:
+          service: blazor-app
+          region: ${{ env.GCP_REGION }}
+          project_id: ${{ env.GCP_PROJECT }}
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/blazor-app:${{ needs.build-and-push.outputs.image-tag }}

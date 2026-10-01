@@ -26,6 +26,18 @@ public enum ShelterAccountStatus
     Rejected
 }
 
+/// <summary>
+/// SurrenderingYourDogFullIntake chapter's "Configure Surrender Intake
+/// Mode" - a single per-shelter switch, not per-step flags. Simple (the
+/// default) is the existing DogSurrenderRequest flow (unchanged).
+/// FullIntake unlocks that chapter's other 10 shelter-staff commands.
+/// </summary>
+public enum SurrenderIntakeMode
+{
+    Simple,
+    FullIntake
+}
+
 public class ShelterAccount : Entity
 {
     [JsonInclude] public Guid RequestedByOwnerId { get; private set; }
@@ -35,6 +47,7 @@ public class ShelterAccount : Entity
     [JsonInclude] public string? VerificationIssuesReason { get; private set; }
     [JsonInclude] public string? RejectionReason { get; private set; }
     [JsonInclude] public DateTimeOffset RequestedAt { get; private set; }
+    [JsonInclude] public SurrenderIntakeMode SurrenderIntakeMode { get; private set; } = SurrenderIntakeMode.Simple;
 
     [JsonConstructor]
     private ShelterAccount() { }
@@ -146,6 +159,20 @@ public class ShelterAccount : Entity
     public ShelterAccountRejectedV1 Reject(string reason)
     {
         var @event = new ShelterAccountRejectedV1(reason.Trim());
+        Apply(@event);
+        return @event;
+    }
+
+    public void Apply(SurrenderIntakeModeConfiguredV1 e) => SurrenderIntakeMode = e.Mode;
+
+    /// <summary>
+    /// SurrenderingYourDogFullIntake chapter's "Configure Surrender Intake
+    /// Mode" -> "Surrender Intake Mode Configured". No state-guard - a
+    /// shelter may switch modes at any time.
+    /// </summary>
+    public SurrenderIntakeModeConfiguredV1 ConfigureSurrenderIntakeMode(SurrenderIntakeMode mode)
+    {
+        var @event = new SurrenderIntakeModeConfiguredV1(mode);
         Apply(@event);
         return @event;
     }

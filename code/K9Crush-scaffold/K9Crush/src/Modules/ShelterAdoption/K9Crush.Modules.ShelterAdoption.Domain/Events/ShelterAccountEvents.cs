@@ -13,3 +13,5 @@ public sealed record ShelterAccountResubmittedV1(string BusinessDetails, Guid Ut
 public sealed record ShelterAccountActivatedV1;
 
 public sealed record ShelterAccountRejectedV1(string Reason);
+
+public sealed record SurrenderIntakeModeConfiguredV1(SurrenderIntakeMode Mode);

@@ -22,6 +22,12 @@ namespace K9Crush.Modules.ShelterAdoption.Api.Commands.AcceptDogSurrender;
 /// listing's Bio (same "Bio doubles as temperament" convention as
 /// GetDogListingDetailsHandler) - HealthNotes stays on the
 /// DogSurrenderRequest record only, not carried onto the public listing.
+///
+/// ShelterAccountId is now also persisted onto DogSurrenderRequest itself
+/// (DogSurrenderAcceptedV1), not just used transiently to create the
+/// DogListing - the SurrenderingYourDogFullIntake chapter's pipeline
+/// commands need it to resolve ownership/FullIntake-mode for a given
+/// surrender request.
 /// </summary>
 public static class AcceptDogSurrenderHandler
 {
@@ -48,7 +54,7 @@ public static class AcceptDogSurrenderHandler
         if (shelterAccount.Status != ShelterAccountStatus.Created)
             return TypedResults.Conflict($"Cannot add a dog listing to a shelter account in status {shelterAccount.Status}.");
 
-        var acceptedEvent = surrenderRequest.Accept();
+        var acceptedEvent = surrenderRequest.Accept(request.ShelterAccountId);
         surrenderStream.AppendOne(acceptedEvent);
 
         var (dogListing, dogListingAddedEvent) = DogListing.AddNew(

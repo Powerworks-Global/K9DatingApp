@@ -1,0 +1,63 @@
+# Grafana file-based alert provisioning (grafana/otel-lgtm's standard,
+# documented mechanism -- confirmed via image inspection: provisioning
+# files load from /otel-lgtm/grafana/conf/provisioning/alerting/). Not a
+# bespoke alert-generation engine -- exactly the "known-good setup" WS4.4
+# asks for.
+#
+# Two alert rules, each tied directly to a CONSTITUTION.md SLO (Tier C).
+# Both are HONESTLY DECLARED, NOT YET ABLE TO FIRE -- there is no
+# OpenTelemetry instrumentation anywhere in RejectApplicationHandler
+# emitting the application-id-tagged events/metrics either rule would need
+# to evaluate against. Provisioning them now means the alert exists the
+# moment instrumentation lands, rather than being a forgotten follow-up --
+# but claiming they're live today would be exactly the kind of silent,
+# never-fires-so-looks-like-nothing's-wrong dishonesty this project's own
+# constitution exists to prevent. See CONSTITUTION.md Tier C for the
+# rules themselves.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: constitution-slos
+    folder: Constitution SLOs
+    interval: 1m
+    rules:
+      - uid: constitution-c1-duplicate-rejection
+        title: "C1 — Duplicate rejection produced"
+        condition: A
+        # Placeholder query -- references a metric/log stream that does not
+        # exist yet. Intentionally left as a query Grafana can parse but
+        # that will never match real data until instrumentation is added.
+        data:
+          - refId: A
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "0 == 1" # never true -- see annotations below
+        for: 5m
+        labels:
+          constitution_rule: C1
+          severity: warning
+        annotations:
+          summary: "A second ApplicationRejected event was produced for an already-rejected application."
+          constitution_reference: "CONSTITUTION.md, Tier C, Rule C1"
+          status: "DECLARED, NOT YET ABLE TO FIRE — no OpenTelemetry instrumentation in RejectApplicationHandler emits an application-id-tagged ApplicationRejected metric/log yet. This rule is provisioned so the alert exists the moment that instrumentation lands, not as a live check today."
+
+      - uid: constitution-c2-missing-rejection
+        title: "C2 — Expected rejection not observed"
+        condition: A
+        data:
+          - refId: A
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: "0 == 1" # never true -- see annotations below
+        for: 5m
+        labels:
+          constitution_rule: C2
+          severity: warning
+        annotations:
+          summary: "A rejection was requested but no corresponding ApplicationRejected emission was observed within the expected window."
+          constitution_reference: "CONSTITUTION.md, Tier C, Rule C2"
+          status: "DECLARED, NOT YET ABLE TO FIRE — same root cause as C1: no OpenTelemetry logging/metrics exist yet for ApplicationRejected emissions, so there is nothing to detect the ABSENCE of either. Provisioned for the same reason as C1."
