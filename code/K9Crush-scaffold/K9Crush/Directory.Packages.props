@@ -50,12 +50,12 @@
          decompression). Pinned explicitly here + referenced directly in
          Api.Host.csproj to force resolution to the patched version rather
          than silently carrying a vulnerable transitive dependency. -->
-    <PackageVersion Include="MessagePack" Version="2.5.301" />                          <!-- [verified - fixes GHSA-hv8m-jj95-wg3x and related] -->
+    <PackageVersion Include="MessagePack" Version="2.5.302" />                          <!-- [verified - fixes GHSA-hv8m-jj95-wg3x and related] -->
 
     <!-- Caching / Real-time -->
     <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />                   <!-- [good-faith] -->
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" /> <!-- [good-faith, inferred same release train as JwtBearer below] -->
-    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.9" /> <!-- [good-faith, inferred same release train] -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.11" /> <!-- [good-faith, inferred same release train] -->
 
     <!-- API / OpenAPI -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />                 <!-- [good-faith] -->
