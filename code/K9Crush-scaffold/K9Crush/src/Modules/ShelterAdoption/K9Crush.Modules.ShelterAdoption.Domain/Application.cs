@@ -158,13 +158,13 @@ public class Application : Entity
     public void Apply(ApplicationDetailsEditedV1 e)
     {
         Details = e.Details;
-        LastEditedAt = DateTimeOffset.UtcNow;
+        LastEditedAt = e.EditedAt;
     }
 
     public void Apply(ApplicationDraftSubmittedV1 e)
     {
         Status = ApplicationStatus.Pending;
-        SubmittedAt = DateTimeOffset.UtcNow;
+        SubmittedAt = e.SubmittedAt;
         Intake = e.Intake;
     }
 
@@ -260,7 +260,7 @@ public class Application : Entity
     /// lives in the handler.</summary>
     public ApplicationDetailsEditedV1 EditDetails(string details)
     {
-        var @event = new ApplicationDetailsEditedV1(details.Trim());
+        var @event = new ApplicationDetailsEditedV1(details.Trim(), DateTimeOffset.UtcNow);
         Apply(@event);
         return @event;
     }
@@ -276,7 +276,7 @@ public class Application : Entity
     /// </summary>
     public ApplicationDraftSubmittedV1 SubmitDraft(ApplicationIntake intake)
     {
-        var @event = new ApplicationDraftSubmittedV1(intake);
+        var @event = new ApplicationDraftSubmittedV1(intake, DateTimeOffset.UtcNow);
         Apply(@event);
         return @event;
     }

@@ -1,6 +1,6 @@
 # K9Crush
 
-.NET modular monolith backend (vertical slice architecture, Marten + Wolverine on PostgreSQL/RabbitMQ, Redis) with a Blazor Web App frontend, YARP gateway, and Supabase Cloud for identity, Postgres, and object storage.
+.NET modular monolith backend (vertical slice architecture, Marten + Wolverine on PostgreSQL/RabbitMQ, Redis) with a Blazor Web App frontend, YARP gateway, and Supabase Cloud for identity and object storage. Postgres is self-hosted, permanently (ADR-047) — see `GETTING_STARTED.md` Step 1.
 
 ## Documents
 See `docs/` for the full design set:
@@ -27,4 +27,4 @@ dotnet restore
 dotnet build
 ```
 
-You'll also need RabbitMQ and Redis running locally (`deploy/compose/docker-compose.yml`), plus a Supabase Cloud project for Postgres/Storage/Auth (see `GETTING_STARTED.md`) — Postgres and object storage are Supabase-managed now, not local containers.
+You'll also need RabbitMQ, Redis, and Postgres running locally (`deploy/compose/docker-compose.yml`), plus a Supabase Cloud project for Storage/Auth (see `GETTING_STARTED.md`). Object storage is Supabase-managed, not a local container. Postgres is self-hosted permanently (ADR-047, superseding ADR-024's Postgres leg) — see `GETTING_STARTED.md` Step 1.

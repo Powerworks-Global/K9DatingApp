@@ -37,9 +37,9 @@ public sealed record ApplicationRejectionV1(string Reason);
 
 public sealed record ApplicationApprovalV1;
 
-public sealed record ApplicationDetailsEditedV1(string Details);
+public sealed record ApplicationDetailsEditedV1(string Details, DateTimeOffset EditedAt);
 
-public sealed record ApplicationDraftSubmittedV1(ApplicationIntake Intake);
+public sealed record ApplicationDraftSubmittedV1(ApplicationIntake Intake, DateTimeOffset SubmittedAt);
 
 public sealed record ApplicationClosedDogNoLongerAvailableV1;
 
