@@ -114,6 +114,12 @@ public class CommandStateFitnessTests
         // applicant), same population-check shape as the two automations
         // above - no mutation happens here at all, purely informational.
         ("K9Crush.Modules.ShelterAdoption.Api.Automations.NotifyApplicantsOfListingChange.NotifyApplicantsOfListingChangeHandler", "K9Crush.Modules.ShelterAdoption.Domain.Application"),
+        // AddToWaitingListHandler queries "how many OTHER DogSurrenderRequests
+        // for this shelter are already on the waiting list" to compute the
+        // next waitlistPosition, before FetchForWriting-ing the ONE request
+        // being mutated - same population-check-then-mutate-one shape as the
+        // Application checks above.
+        ("K9Crush.Modules.ShelterAdoption.Api.Commands.AddToWaitingList.AddToWaitingListHandler", "K9Crush.Modules.ShelterAdoption.Domain.DogSurrenderRequest"),
     };
 
     /// <summary>
@@ -155,6 +161,16 @@ public class CommandStateFitnessTests
         // from the DogSurrenderRequest this handler appends to and the new
         // DogListing stream it starts.
         ("K9Crush.Modules.ShelterAdoption.Api.Commands.AcceptDogSurrender.AcceptDogSurrenderHandler", "K9Crush.Modules.ShelterAdoption.Domain.ShelterAccount"),
+        // Ownership + FullIntake-mode checks against the owning
+        // ShelterAccount (via DogSurrenderRequest.ShelterAccountId, set at
+        // Accept time), distinct from the DogSurrenderRequest this handler
+        // mutates.
+        ("K9Crush.Modules.ShelterAdoption.Api.Commands.ScheduleIntakeAppointment.ScheduleIntakeAppointmentHandler", "K9Crush.Modules.ShelterAdoption.Domain.ShelterAccount"),
+        // Ownership/FullIntake-mode check against the shelter that accepted
+        // this surrender request, resolved via the (now-persisted)
+        // DogSurrenderRequest.ShelterAccountId - distinct from the
+        // DogSurrenderRequest stream this handler appends to.
+        ("K9Crush.Modules.ShelterAdoption.Api.Commands.CompleteSurrenderPaperwork.CompleteSurrenderPaperworkHandler", "K9Crush.Modules.ShelterAdoption.Domain.ShelterAccount"),
         // Availability checks: the handler mutates/creates an Application
         // but reads the referenced DogListing (read-only) to confirm it
         // still exists/isn't withdrawn.
@@ -168,6 +184,19 @@ public class CommandStateFitnessTests
         // referenced FosterApplication (a different aggregate) read-only
         // to confirm it's Approved.
         ("K9Crush.Modules.ShelterAdoption.Api.Commands.PlaceDogInFoster.PlaceDogInFosterHandler", "K9Crush.Modules.ShelterAdoption.Domain.FosterApplication"),
+        // PerformBehaviorTestHandler mutates DogSurrenderRequest (its own
+        // stream, via FetchForWriting) but resolves ownership the same way
+        // UpdateListingStatusHandler does: reads the referenced DogListing
+        // (read-only, dog_id -> ShelterAccountId) then the owning
+        // ShelterAccount (read-only, RequestedByOwnerId check) - two
+        // different aggregates, neither is the mutation target.
+        ("K9Crush.Modules.ShelterAdoption.Api.Commands.PerformBehaviorTest.PerformBehaviorTestHandler", "K9Crush.Modules.ShelterAdoption.Domain.DogListing"),
+        ("K9Crush.Modules.ShelterAdoption.Api.Commands.PerformBehaviorTest.PerformBehaviorTestHandler", "K9Crush.Modules.ShelterAdoption.Domain.ShelterAccount"),
+        // AddToWaitingListHandler mutates its own DogSurrenderRequest but
+        // LoadAsyncs the owning ShelterAccount (via the request's own
+        // ShelterAccountId, set at Accept time) for the ownership + FullIntake
+        // mode checks - same shape as UpdateListingStatusHandler above.
+        ("K9Crush.Modules.ShelterAdoption.Api.Commands.AddToWaitingList.AddToWaitingListHandler", "K9Crush.Modules.ShelterAdoption.Domain.ShelterAccount"),
     };
 
     [Fact]

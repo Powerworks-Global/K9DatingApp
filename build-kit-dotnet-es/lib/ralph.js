@@ -283,9 +283,30 @@ function readCurrentContext(kitDir) {
 // orchestrator's own git-status check before removal is the real backstop.
 const RALPH_STOP_FILE = '.ralph-stop';
 
-// Returns the first Planned slice IN THE CURRENT CONTEXT ONLY. If the current
-// context has no planned work, returns null so the loop waits — it must NEVER
-// cross into another context to find something to build.
+// Written by orchestrate.mjs before it spawns Ralph instances for a chapter
+// (all instances share this kitDir). The board's own "context" grouping
+// (slicedata's contextName) is NOT per-chapter — on this board every slice
+// comes back with contextName "default", so "current context" alone doesn't
+// stop a loop from grabbing a stray Planned slice left over from some other,
+// already-shipped chapter. This file is the real per-chapter filter; absent
+// (e.g. running ralph-claude.js standalone, with no orchestrate.mjs) means
+// no filtering, preserving the old behavior.
+function readChapterScope(kitDir) {
+  const scopePath = join(kitDir, '.slices', 'chapter-scope.json');
+  if (!existsSync(scopePath)) return null;
+  try {
+    const { sliceIds } = JSON.parse(readFileSync(scopePath, 'utf-8'));
+    return Array.isArray(sliceIds) && sliceIds.length ? new Set(sliceIds) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns the first Planned slice IN THE CURRENT CONTEXT ONLY, further
+// restricted to chapter-scope.json when orchestrate.mjs has written one. If
+// the current context (post-filter) has no planned work, returns null so the
+// loop waits — it must NEVER cross into another context, or outside the
+// active chapter scope, to find something to build.
 function getFirstPlannedSlice(kitDir) {
   const currentCtx = readCurrentContext(kitDir);
   if (!currentCtx) return null;
@@ -293,10 +314,52 @@ function getFirstPlannedSlice(kitDir) {
   if (!existsSync(indexPath)) return null;
   try {
     const { slices } = JSON.parse(readFileSync(indexPath, 'utf-8'));
-    const planned = slices && slices.find((s) => (s.status || '').toLowerCase() === 'planned');
+    const scope = readChapterScope(kitDir);
+    const candidates = scope ? (slices || []).filter((s) => scope.has(s.id)) : slices;
+    const planned = candidates && candidates.find((s) => (s.status || '').toLowerCase() === 'planned');
     if (planned) return { id: planned.id || null, title: planned.slice || planned.id || null };
   } catch {}
   return null;
+}
+
+// Atomically claims a candidate slice by writing InProgress directly,
+// instead of just reading its status — closes the window a read-only check
+// can't: several Ralph instances restarting at the same instant each get a
+// local index.json snapshot that (correctly, at that moment) shows the same
+// slice as Planned, and a plain read-check can't tell them apart since none
+// has claimed it yet. The board enforces this atomically server-side (see
+// the update-slice-status skill): a write to a status the slice is already
+// in is rejected — that rejection IS the concurrency guard, not an error.
+//
+// Returns 'claimed', 'conflict' (someone else got there first — the caller
+// must not build it), or 'unknown' (the check itself errored, e.g. a network
+// blip — fails open by letting the caller fall back to cached status, so
+// backend flakiness can't stall the loop forever; backend-prompt.md's own
+// Step 4 claim-and-defer handling remains the backstop in that case).
+async function claimPlannedSlice(cfg, sliceId) {
+  const url = `${cfg.baseUrl}/api/org/${cfg.organizationId}/boards/${cfg.boardId}/nodes/events`;
+  try {
+    await fetchJSON(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-token': cfg.token, 'x-board-id': cfg.boardId },
+      body: JSON.stringify([{
+        id: randomUUID(),
+        eventType: 'node:changed',
+        nodeId: sliceId,
+        boardId: cfg.boardId,
+        timestamp: Date.now(),
+        changedAttributes: ['sliceStatus'],
+        meta: { sliceStatus: 'InProgress' },
+      }]),
+    });
+    return 'claimed';
+  } catch (err) {
+    if (err instanceof HttpError && (err.status === 409 || /already/i.test(err.message))) {
+      return 'conflict';
+    }
+    console.error('[ralph] Claim attempt failed — proceeding on cached status:', err.message);
+    return 'unknown';
+  }
 }
 
 // Marks a SLICE_BORDER node Blocked directly on the board — used when a slice
@@ -386,9 +449,36 @@ async function ralphLoop(kitDir, projectDir, cfg, onTask, onPlannedSlice) {
       console.log(`[ralph] Stop signal found at ${join(projectDir, RALPH_STOP_FILE)} — orchestrator is cleaning up this worktree, not picking up new planned slices.`);
       stopLogged = true;
     }
-    const planned = !stopSignaled && onPlannedSlice && getFirstPlannedSlice(kitDir);
+    let planned = !stopSignaled && onPlannedSlice && getFirstPlannedSlice(kitDir);
+    let preClaimed = false;
+    if (planned && planned.id && credentialed) {
+      const outcome = await claimPlannedSlice(cfg, planned.id);
+      if (outcome === 'conflict') {
+        console.log(`[ralph] "${planned.title}" was claimed elsewhere since the last sync — refreshing and re-checking.`);
+        await fetchAndPersistSlices(cfg, kitDir).catch(() => {});
+        planned = null;
+      } else if (outcome === 'claimed') {
+        preClaimed = true;
+        await fetchAndPersistSlices(cfg, kitDir).catch(() => {});
+      }
+      // 'unknown' (claim check itself errored) — proceed unclaimed on cached
+      // status; backend-prompt.md's own Step 4 claim-and-defer is the backstop.
+    }
     if (planned) {
-      const prompt = readFileSync(backendPromptFile, 'utf-8').replaceAll('build-kit-dotnet-es', kitDir);
+      const basePrompt = readFileSync(backendPromptFile, 'utf-8').replaceAll('build-kit-dotnet-es', kitDir);
+      // A pre-claimed slice MUST be named explicitly — backend-prompt.md's
+      // Step 4 otherwise re-derives its own "highest priority Planned slice"
+      // from scratch, which (now that ours is InProgress) would be a
+      // DIFFERENT slice than the one just claimed above, orphaning the
+      // claimed one at InProgress forever with nobody actually building it.
+      const prompt = preClaimed
+        ? `## Pre-claimed slice (added by ralph.js — read this before Step 4)\n\n` +
+          `This iteration already claimed **"${planned.title}"** (id \`${planned.id}\`) by setting its board status to InProgress, to prevent two Ralph instances racing to build the same slice.\n\n` +
+          `- Build exactly this slice. Skip the Planned-scan-and-claim part of Step 4 below — look this slice up by id/title in \`index.json\` for its \`folder\`, then proceed from Step 5 (load \`slice.json\`, implement, test, commit, mark Done) as normal.\n` +
+          `- Do not call \`update-slice-status\` to claim it again — it is already InProgress. If you do and it reports "already in status", that's expected — ignore it and continue.\n` +
+          `- Only if this slice is missing, or already Done/Blocked by the time you look (a rare late race): fall back to Step 4's normal Planned-scan (still restricted to chapter-scope.json when present) and build whatever else is Planned instead. Do not touch this slice's status further either way — it's already accounted for.\n\n` +
+          `---\n\n${basePrompt}`
+        : basePrompt;
       await runWithRetry(`onPlannedSlice: building slice "${planned.title}"...`, () => onPlannedSlice(prompt), {
         onGiveUp: planned.id
           ? () => markSliceBlocked(cfg, planned.id, `onPlannedSlice failed repeatedly while building "${planned.title}"`)

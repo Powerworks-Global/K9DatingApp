@@ -24,7 +24,7 @@
 // after killing instances early, before a chapter finished.
 
 import { spawn, execFileSync } from 'child_process';
-import { readFileSync, existsSync, openSync, appendFileSync, writeFileSync } from 'fs';
+import { readFileSync, existsSync, openSync, appendFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, resolve, join, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
@@ -230,6 +230,26 @@ async function flipToPlanned(sliceIds) {
   return { flipped, skipped, planned };
 }
 
+// ── Chapter scope (read by lib/ralph.js's getFirstPlannedSlice) ─────────
+// The board's own "context" grouping (slicedata's contextName) puts every
+// slice on this board into one flat "default" bucket — it isn't per-chapter.
+// That means a Ralph loop's "first Planned slice in the current context"
+// search can (and did, in practice) surface a stray Planned slice left over
+// from a completely unrelated, already-shipped chapter instead of one of
+// THIS chapter's slices. chapter-scope.json is the actual chapter filter:
+// written before spawning instances, read by every instance (they share one
+// kitDir), cleared once this chapter's run completes normally.
+const CHAPTER_SCOPE_FILE = join(kitDir, '.slices', 'chapter-scope.json');
+
+function writeChapterScope(chapterTitle, sliceIds) {
+  mkdirSync(dirname(CHAPTER_SCOPE_FILE), { recursive: true });
+  writeFileSync(CHAPTER_SCOPE_FILE, JSON.stringify({ chapterTitle, sliceIds }, null, 2), 'utf-8');
+}
+
+function clearChapterScope() {
+  try { writeFileSync(CHAPTER_SCOPE_FILE, JSON.stringify({ sliceIds: [] }, null, 2), 'utf-8'); } catch {}
+}
+
 // ── Per-instance git worktrees ──────────────────────────────────────────
 function git(args, cwd = projectDir) {
   return execFileSync('git', args, { cwd, encoding: 'utf-8' }).trim();
@@ -280,6 +300,60 @@ function worktreeHasUncommittedChanges(dir) {
   return status.trim().length > 0;
 }
 
+// ── Static quality gate ──────────────────────────────────────────────────
+// Runs the deterministic, non-LLM checks from quality-checks.md's Phase 1
+// (dotnet format/build/vulnerable-package scan) here, once per worktree
+// right before it merges — not per commit inside the Ralph loop's own
+// PreToolUse hook (hooks/quality-gate.sh), which used to re-run all three
+// on every single `git commit` attempt. That was the real throughput cost:
+// a full solution build + format-check + vuln-scan, repeated per commit,
+// times every parallel instance. Running it once per worktree here catches
+// the same class of issue for a fraction of the wall-clock cost. The hook
+// still runs on every commit for the genuinely cheap checks (secret-scan,
+// stuck-loop guard) that don't touch the whole solution.
+function findSln(dir) {
+  try {
+    const out = execFileSync('find', ['.', '-maxdepth', '2', '(', '-name', '*.sln', '-o', '-name', '*.slnx', ')'], { cwd: dir, encoding: 'utf-8' });
+    const first = out.split('\n').map((s) => s.trim()).find(Boolean);
+    return first || null;
+  } catch {
+    return null;
+  }
+}
+
+function runDotnet(args, dir) {
+  try {
+    const out = execFileSync('dotnet', args, { cwd: dir, encoding: 'utf-8', stdio: 'pipe' });
+    return { ok: true, output: out };
+  } catch (err) {
+    return { ok: false, output: (err.stdout || '') + (err.stderr || '') || err.message };
+  }
+}
+
+function runQualityGate(dir) {
+  const sln = findSln(dir);
+  if (!sln) return { passed: true, failures: [] }; // nothing to check against
+
+  const failures = [];
+
+  const fmt = runDotnet(['format', sln, '--verify-no-changes'], dir);
+  if (!fmt.ok) failures.push(`'dotnet format --verify-no-changes' found unformatted code:\n${fmt.output}`);
+
+  const build = runDotnet(['build', sln], dir);
+  if (!build.ok) failures.push(`'dotnet build' failed:\n${build.output}`);
+
+  // dotnet list package --vulnerable exits 0 even when it finds vulnerable
+  // packages — the finding is in the text output, not the exit code.
+  const vuln = runDotnet(['list', sln, 'package', '--vulnerable'], dir);
+  if (!vuln.ok) {
+    failures.push(`'dotnet list package --vulnerable' errored:\n${vuln.output}`);
+  } else if (/has the following vulnerable packages/i.test(vuln.output)) {
+    failures.push(`'dotnet list package --vulnerable' found known-vulnerable packages:\n${vuln.output}`);
+  }
+
+  return { passed: failures.length === 0, failures };
+}
+
 function ensureWorktree(n, startPoint) {
   const dir = worktreeDir(n);
   const branch = `ralph/instance-${n}`;
@@ -305,6 +379,16 @@ async function mergeWorktrees(n, targetBranch) {
       console.log(`  - ${branch}: no such branch, skipping`);
       continue;
     }
+
+    console.log(`  - running static quality gate on ${dir}...`);
+    const gate = runQualityGate(dir);
+    if (!gate.passed) {
+      console.error(`  ! quality gate failed for ${branch} — NOT merging. Fix in ${dir} (or re-run this chapter), commit, then re-run:\n      node orchestrate.mjs ${projectDir} --merge --parallel ${n}\n    (leaving this worktree/branch in place; not touching later instances)`);
+      gate.failures.forEach((f) => console.error(`      - ${f.split('\n')[0]}`));
+      continue;
+    }
+    console.log(`  - quality gate passed for ${branch}`);
+
     try {
       git(['merge', '--no-edit', branch]);
       console.log(`  - merged ${branch} into ${targetBranch}`);
@@ -459,6 +543,9 @@ async function main() {
     return;
   }
 
+  writeChapterScope(chapter.meta.title, sliceIds);
+  console.log(`\nWrote chapter-scope.json (${sliceIds.length} slice id(s)) — Ralph instances will only pick up Planned slices from this chapter.`);
+
   const startBranch = git(['rev-parse', '--abbrev-ref', 'HEAD']);
   console.log(`\nStarting ${parallel} Ralph instance(s), each in its own worktree off "${startBranch}"...`);
   // Stagger spawns — starting two instances at the exact same instant
@@ -478,6 +565,7 @@ async function main() {
       if (existsSync(dir)) signalStop(dir, `chapter "${chapter.meta.title}" completed at ${new Date().toISOString()} — orchestrator is merging this worktree, not picking up new work`);
     }
     await mergeWorktrees(parallel, startBranch);
+    clearChapterScope();
   } else {
     console.log(`\nNot merging worktree branches yet — the Ralph instance(s) are still running (this is just the watch loop giving up after ${timeoutMinutes}m). Re-run with --watch to resume monitoring, or with --merge once you've stopped them, to merge whatever they finished.`);
   }

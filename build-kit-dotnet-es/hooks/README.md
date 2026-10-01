@@ -5,6 +5,22 @@ Implements Phase 1 (Option A, deterministic-only) of
 hook on the `Bash` matcher that gates `git commit` before it happens, plus
 a stuck-loop guard on repeated `dotnet build`/`dotnet test` calls.
 
+**2026-07-31 update**: the solution-wide checks (`dotnet format
+--verify-no-changes`, `dotnet build`, `dotnet list package --vulnerable`)
+no longer live here — they moved to `../orchestrate.mjs`'s
+`runQualityGate()`, which runs them **once per worktree, at merge time**,
+instead of once per `git commit` inside every Ralph instance's Claude Code
+session. Re-running a full solution build/format/vuln-scan on every commit
+attempt, times every parallel instance, was measured throughput cost with
+no extra safety once a per-worktree gate exists right before the code
+lands on the target branch anyway. This hook now only runs the checks that
+are legitimately cheap no matter how often they fire: the secret-scan
+(a grep over the staged diff) and the stuck-loop guard (a hash compare).
+See `../orchestrate.mjs`'s `mergeWorktrees()` for the moved checks — on
+failure it leaves that worktree/branch unmerged and in place (same
+convention as a merge conflict), rather than losing or silently dropping
+the work.
+
 ## Why this lives here, but installs elsewhere
 
 Ralph invokes `claude` with `cwd` set to the **target .NET solution's own
@@ -68,23 +84,26 @@ Claude Code hooks work.
 1. **Secret scan** over the staged diff — a regex match on
    `api_key`/`secret`/`password`/`token` followed by a quoted value ≥8
    chars. Blocks on match.
-2. **`dotnet format --verify-no-changes`** — blocks if any file isn't
-   already formatted.
-3. **`dotnet build`** — blocks on build failure. (Ralph's own prompt
-   already runs this before attempting to commit — this is a second,
-   independent check at the point of commit itself, not a trust of what
-   the agent already claimed.)
-4. **`dotnet list package --vulnerable`** — blocks if any referenced NuGet
-   package has a known vulnerability.
 
-If everything passes, an audit line is appended to
-`.claude/metrics/gate-history.jsonl` (timestamp + a hash of the staged
-diff) and the commit proceeds. This is an audit trail, not a skip-cache —
-the gate re-runs in full on every commit attempt; nothing is cached to
-avoid re-running it, since all four checks here are cheap and
-deterministic. Caching becomes relevant once Phase 2/3 add an LLM
-reviewer pass (see `../quality-checks.md`), which is not free to re-run
-speculatively.
+If it passes, an audit line is appended to `.claude/metrics/gate-history.jsonl`
+(timestamp + a hash of the staged diff) and the commit proceeds. This is
+an audit trail, not a skip-cache — the scan re-runs on every commit
+attempt; nothing is cached to avoid re-running it, since it's cheap.
+Caching becomes relevant once Phase 2/3 add an LLM reviewer pass (see
+`../quality-checks.md`), which is not free to re-run speculatively.
+
+## What moved to `orchestrate.mjs` (once per worktree, at merge time)
+
+1. **`dotnet format --verify-no-changes`** — blocks the merge if any file
+   isn't already formatted.
+2. **`dotnet build`** — blocks the merge on build failure. (Ralph's own
+   prompt already runs this before attempting to commit each slice — this
+   is a second, independent check at merge time, not a trust of what the
+   agent already claimed.)
+3. **`dotnet list package --vulnerable`** — blocks the merge if any
+   referenced NuGet package has a known vulnerability.
+
+See `runQualityGate()` / `mergeWorktrees()` in `../orchestrate.mjs`.
 
 ## The bypass path
 

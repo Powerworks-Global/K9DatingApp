@@ -57,7 +57,7 @@ Each train is a shippable increment; trains run mostly sequentially given team s
 | Phase | Train | Duration | Goal |
 |---|---|---|---|
 | 0 | - | 2 weeks | Finalize module boundaries, ADRs, environment strategy, repo scaffolding |
-| 1 | - | 3 weeks | Platform foundation: solution skeleton, Supabase Cloud project setup (Postgres/PostGIS/Storage/Auth), RabbitMQ/Wolverine, Redis, Grafana LGTM, docker-compose dev env, base CI pipeline |
+| 1 | - | 3 weeks | Platform foundation: solution skeleton, self-hosted Postgres/PostGIS (ADR-047) with its own backup story, Supabase Cloud project setup (Storage/Auth), RabbitMQ/Wolverine, Redis, Grafana LGTM, docker-compose dev env, base CI pipeline |
 | 2-5 | A | 10 weeks | Core dating MVP - Identity, Profiles, Discovery/Matching, Chat, Notifications, Media, Subscriptions, Moderation |
 | 6 | A | 2 weeks | Beta & launch prep for Train A: soak test, production CD, runbooks |
 | 7-9 | B | 7 weeks | Community feed, Scheduling (playdates + events), reminder notifications |

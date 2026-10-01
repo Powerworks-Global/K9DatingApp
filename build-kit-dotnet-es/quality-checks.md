@@ -1,10 +1,18 @@
 # Quality checks and guardrails for the Ralph loop — plan for review
 
 **Status: Option D (phased rollout) chosen. Phase 1 (Option A,
-deterministic-only gate) is implemented — see `hooks/quality-gate.sh` and
-`hooks/README.md`, installed as a Claude Code `PreToolUse` hook in the
-target solution's own `.claude/settings.json`. Phases 2/3 remain unbuilt,
-deferred until Phase 1 shows what it's actually missing.**
+deterministic-only gate) is implemented, split across two places as of
+2026-07-31: the cheap, per-commit checks (secret-scan, stuck-loop guard)
+stay in `hooks/quality-gate.sh` as a Claude Code `PreToolUse` hook in the
+target solution's own `.claude/settings.json`; the solution-wide checks
+(`dotnet format --verify-no-changes` / `dotnet build` / `dotnet list
+package --vulnerable`) moved to `orchestrate.mjs`'s `runQualityGate()`,
+which runs them once per worktree at merge time instead of once per commit
+— re-running a full solution build/format/vuln-scan on every single commit,
+across every parallel Ralph instance, was real throughput cost with no
+extra safety once a per-worktree gate exists right before the code lands
+anyway. See `hooks/README.md` for the exact split. Phases 2/3 remain
+unbuilt, deferred until Phase 1 shows what it's actually missing.**
 
 ## The problem today
 
@@ -239,6 +247,15 @@ for Claude-Code-mediated Bash calls, so it's inherently scoped to Ralph
 touches a human committing directly from a plain terminal. Whether to
 *also* add a plain git pre-commit hook for that remaining case is still
 open — revisit once Phase 1 has run for a while.
+
+**Update 2026-07-31**: after the first live orchestrator run, moved the
+solution-wide checks (format/build/vulnerable-package) out of this
+per-commit hook and into `orchestrate.mjs`'s `runQualityGate()`, run once
+per worktree at merge time instead. The hook itself stays — it's still the
+right mechanism for the genuinely cheap, per-commit checks (secret-scan,
+stuck-loop guard) — but paying full solution-build cost on every commit,
+times every parallel instance, was a real speed problem with no added
+safety once a gate exists right before merge anyway.
 
 ## What Phase 2/3 will need to decide, when picked up
 

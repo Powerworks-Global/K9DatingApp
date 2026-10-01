@@ -48,6 +48,8 @@ Inspect the `sliceStatus` in the payload:
 
 This is the build trigger. Setting `InProgress` and building are one atomic step:
 
+0. **Chapter scope check**: if `build-kit-dotnet-es/.slices/chapter-scope.json` exists and has a non-empty `sliceIds` array, and this task's `payload.sliceId` is NOT in that array, this slice is not yours to build — log it in `progress.txt` and drop the task without building (same as the `InProgress`/claim-conflict case below), regardless of how this task ended up in `tasks.json`.
+
 1. Immediately call `update-slice-status` to set the slice to `InProgress` on the board.
 
    **Claim conflict**: if this call reports the slice is already in `InProgress` (or any status other than `Planned`), another agent already claimed it first — this is expected, not an error. Log it in `build-kit-dotnet-es/progress.txt`, drop this task without building, and continue the loop (the next task will naturally cover the next slice). Do not retry.

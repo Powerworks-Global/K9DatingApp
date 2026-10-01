@@ -1,0 +1,32 @@
+{
+  "sliceFolder": "RejectApplication",
+  "_source": "Board Vocabulary -> Operability Mapping (WS4.1, Storyboard Canvas vault note), mechanized here so a generator can read it rather than leaving the analysis as prose.",
+  "outcomes": [
+    {
+      "name": "ApplicationRejected",
+      "sourceSpecId": "spec-2",
+      "isFailureMode": false,
+      "rollback": {
+        "possible": false,
+        "reason": "Once ApplicationRejected has been delivered to the Notifications module, the event can't be recalled.",
+        "compensatingAction": "A future 're-open application' command could exist as a compensating action; not implemented today -- a real, on-record gap, not silently assumed away."
+      },
+      "escalation": {
+        "contact": "TODO: not yet specified -- no on-call rotation or escalation path declared anywhere for this module."
+      }
+    },
+    {
+      "name": "Duplicate rejection (a rejected-again application producing a second ApplicationRejected event)",
+      "sourceSpecId": "spec-3",
+      "isFailureMode": true,
+      "constitutionRule": "C1",
+      "rollback": {
+        "possible": false,
+        "reason": "N/A -- this Outcome should never occur at all. The fix is closing the guard (CONSTITUTION.md Rule C1), not rolling back an occurrence after the fact."
+      },
+      "escalation": {
+        "contact": "TODO: not yet specified"
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "sliceId": "3f519bff-af4f-4156-bc58-0539c1d792e2",
+  "specifications": [
+    {
+      "id": "spec-1",
+      "title": "Rejecting an application that does not exist",
+      "given": "no application exists with the given id",
+      "when": "the shelter owner attempts to reject it",
+      "then": "a Not Found result is returned and no integration event is produced",
+      "sourceExampleId": "example-1",
+      "rule": "Only an application under review can be rejected by its shelter owner"
+    },
+    {
+      "id": "spec-2",
+      "title": "Rejecting an application under review",
+      "given": "an application submitted for a dog listing is under review",
+      "when": "the shelter owner rejects it with a reason",
+      "then": "the application status becomes Rejected and an ApplicationRejected event is produced carrying the dog's name and the rejection reason",
+      "sourceExampleId": "example-2",
+      "rule": "Only an application under review can be rejected by its shelter owner"
+    },
+    {
+      "id": "spec-3",
+      "title": "Rejecting an application that is already rejected",
+      "given": "an application has already been rejected",
+      "when": "the shelter owner attempts to reject it again",
+      "then": "a Conflict result is returned and no new integration event is produced",
+      "sourceExampleId": "em-1789100776837-1",
+      "rule": "Only an application under review can be rejected by its shelter owner"
+    }
+  ],
+  "warnings": []
+}
