@@ -159,10 +159,14 @@ builder.Services.AddSignalR()
 // --- API infrastructure --------------------------------------------------
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-// --- Auth: validate JWTs issued by Supabase Auth (ADR-005) ---------------
+// --- Auth: validate bearer JWTs (ADR-005 Supabase, ADR-048 local dev) -----
 // Api.Host is a pure resource server - it never issues or stores
-// credentials. Supabase Cloud owns registration/login/MFA/password reset;
-// this only validates the bearer token Supabase already issued.
+// credentials. In every real environment Supabase Cloud owns
+// registration/login/MFA/password reset; this only validates the bearer
+// token Supabase already issued. In Development, Auth:Provider=Local
+// replaces that with a local HS256 signing key so a developer can run the
+// app without a Supabase project - see ADR-048 and Identity's
+// Commands/DevSignIn.
 //
 // Confirmed live against a real Supabase project (2026-07-23): new
 // projects issue session tokens signed with ES256 (asymmetric JWKS), not
@@ -175,12 +179,72 @@ builder.Services.AddSwaggerGen();
 // and auto-rotates on its own - no manual key material in this config at
 // all, and it transparently keeps working if the project's active
 // signing key ever changes.
-var supabaseUrl = builder.Configuration["Supabase:Url"]
-    ?? throw new InvalidOperationException("Missing Supabase:Url");
+var authProvider = builder.Configuration["Auth:Provider"] ?? "Supabase";
+var useLocalDevAuth = string.Equals(authProvider, "Local", StringComparison.OrdinalIgnoreCase);
+
+// The local provider is a development-only stand-in with no password
+// verification - refuse to run it anywhere else rather than trust config
+// (ADR-048).
+if (useLocalDevAuth && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        $"Auth:Provider=Local is only allowed in Development (current environment: {builder.Environment.EnvironmentName}).");
+}
+
+// Resolve the local signing key once, here, so a misconfigured dev
+// environment fails fast at startup instead of on the first request.
+string? localSigningKey = null;
+string? localIssuer = null;
+if (useLocalDevAuth)
+{
+    localSigningKey = builder.Configuration["Auth:Local:SigningKey"]
+        ?? throw new InvalidOperationException("Missing Auth:Local:SigningKey (required when Auth:Provider=Local).");
+    if (localSigningKey.Length < 32)
+        throw new InvalidOperationException("Auth:Local:SigningKey must be at least 32 characters (HMAC-SHA256 minimum key size).");
+
+    localIssuer = builder.Configuration["Auth:Local:Issuer"] ?? "k9crush-local";
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
+        // Since .NET 8, JwtBearer's default token handler stopped
+        // auto-remapping short JWT claim names (sub, email, name, ...) to
+        // their long-form ClaimTypes.* URIs - claims come through exactly
+        // as the IdP names them instead. Every handler in this codebase
+        // that reads ClaimTypes.NameIdentifier (e.g. AddDogListing,
+        // ApplyToAdopt) was written assuming the older remapped behavior.
+        // Restoring it centrally here means those handlers don't each
+        // need to know the IdP's raw claim names - fix once, works
+        // everywhere any future module reads the caller's identity. This
+        // was originally fixed for Keycloak but applies identically to
+        // Supabase, since both issue standard JWTs with short claim names.
+        options.MapInboundClaims = true;
+
+        if (useLocalDevAuth)
+        {
+            // No Authority/JWKS in local mode - a fixed symmetric key that
+            // matches what LocalDevTokenIssuer signs with.
+            options.RequireHttpsMetadata = false;
+            options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = localIssuer!,
+                ValidateAudience = true,
+                // Same audience as Supabase (below) so nothing downstream
+                // needs to know which provider issued the token.
+                ValidAudience = "authenticated",
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(
+                    System.Text.Encoding.UTF8.GetBytes(localSigningKey!)),
+                ValidateLifetime = true
+            };
+            return;
+        }
+
+        var supabaseUrl = builder.Configuration["Supabase:Url"]
+            ?? throw new InvalidOperationException("Missing Supabase:Url");
+
         options.Authority = $"{supabaseUrl}/auth/v1";
         options.RequireHttpsMetadata = true;
         options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
@@ -195,20 +259,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             ValidateLifetime = true
         };
-
-        // Since .NET 8, JwtBearer's default token handler stopped
-        // auto-remapping short JWT claim names (sub, email, name, ...) to
-        // their long-form ClaimTypes.* URIs - claims come through exactly
-        // as the IdP names them instead. Every handler in this codebase
-        // that reads ClaimTypes.NameIdentifier (e.g. AddDogListing,
-        // ApplyToAdopt) was written assuming the older remapped behavior.
-        // Restoring it centrally here means those handlers don't each
-        // need to know the IdP's raw claim names - fix once, works
-        // everywhere any future module reads the caller's identity. This
-        // was originally fixed for Keycloak but applies identically to
-        // Supabase, since both issue standard JWTs with short claim names.
-        options.MapInboundClaims = true;
     });
+
+// Local dev token issuer (ADR-048). Registered unconditionally so
+// Identity's Commands/DevSignIn can resolve it; IssueToken throws if
+// Auth:Local:SigningKey isn't set and the endpoint 404s unless
+// Auth:Provider=Local, so it is inert outside local development.
+builder.Services.AddSingleton<ILocalDevTokenIssuer, LocalDevTokenIssuer>();
 
 // ADR-017 role checking (RoleRequirement/RoleAuthorizationHandler, both
 // in BuildingBlocks.Web) - registered Scoped, not Singleton, since its

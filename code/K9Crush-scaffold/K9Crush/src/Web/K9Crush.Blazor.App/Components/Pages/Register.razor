@@ -5,7 +5,7 @@
 @using Microsoft.AspNetCore.Authentication.Cookies
 @using K9Crush.Blazor.App.Services
 @using System.Text.Json
-@inject SupabaseAuthService SupabaseAuthService
+@inject IAuthService AuthService
 @inject NavigationManager NavigationManager
 @inject IHttpContextAccessor HttpContextAccessor
 
@@ -56,10 +56,10 @@ else
 
     private async Task RegisterAsync()
     {
-        SupabaseAuthResult result;
+        AuthResult result;
         try
         {
-            result = await SupabaseAuthService.SignUpAsync(Input.Email, Input.Password, CancellationToken.None);
+            result = await AuthService.SignUpAsync(Input.Email, Input.Password, CancellationToken.None);
         }
         catch (Exception ex) when (ex is HttpRequestException or InvalidOperationException or JsonException)
         {

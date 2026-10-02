@@ -13,6 +13,12 @@
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
+  <!-- LocalDevTokenIssuer (ADR-048) mints/validates the Auth:Provider=Local
+       JWT, so this shared auth block needs the JWT packages. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\K9Crush.BuildingBlocks.Domain\K9Crush.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\K9Crush.BuildingBlocks.Persistence\K9Crush.BuildingBlocks.Persistence.csproj" />

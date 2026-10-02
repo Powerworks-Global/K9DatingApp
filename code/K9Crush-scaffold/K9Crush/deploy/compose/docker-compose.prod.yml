@@ -59,6 +59,10 @@ services:
       dockerfile: deploy/docker/ApiHost.Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      # Explicit (not just the appsettings.json default) so a stray
+      # Auth__Provider=Local can never be inherited into a real deploy -
+      # Api.Host also refuses to start with Local outside Development.
+      Auth__Provider: Supabase
       ConnectionStrings__Postgres: ${SUPABASE_POSTGRES_CONNECTION_STRING}
       ConnectionStrings__RabbitMQ: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672
       ConnectionStrings__Redis: redis:6379
@@ -80,6 +84,7 @@ services:
       dockerfile: deploy/docker/BlazorApp.Dockerfile
     environment:
       ASPNETCORE_ENVIRONMENT: Production
+      Auth__Provider: Supabase
       ApiBaseUrl: http://api-host:8080
     depends_on:
       - api-host

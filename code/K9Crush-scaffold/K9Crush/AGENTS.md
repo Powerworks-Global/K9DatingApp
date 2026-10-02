@@ -100,6 +100,13 @@ and Auth remain Supabase-managed per ADR-024. No Flyway/SQL migration files
 for application schema either way; Marten manages document/event schema
 automatically (`AutoCreateSchemaObjects`, see `Program.cs`).
 
+**Local dev auth (ADR-048):** `Auth:Provider=Local` is the default in
+`appsettings.Development.json` — Identity's `Commands/DevSignIn` provisions and
+verifies the `OwnerAccount` and Api.Host accepts locally-signed tokens, so no
+Supabase project is needed to run or test authenticated endpoints. Set
+`Auth:Provider=Supabase` to use a real Supabase project locally instead. Local is
+rejected at startup outside Development.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
