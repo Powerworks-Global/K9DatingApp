@@ -26,9 +26,36 @@ Useful UIs once it's up:
 | Grafana | http://localhost:3000 | admin / admin |
 | smtp4dev (email inbox) | http://localhost:5080 | none — this is where Notifications' real SMTP sends actually land in dev (ADR-027); check here after triggering a match or an application approval/rejection |
 
-## 2. Set up the Supabase project (manual, one-time)
+## 2 (optional) — or skip Supabase entirely during development
 
-Supabase Cloud covers Auth, Postgres, and Storage now (ADR-005/024) — all external managed services, nothing local to run for any of them. **There is currently no local/mock stand-in for Supabase Auth** — every authenticated endpoint genuinely needs a real Supabase project.
+`appsettings.Development.json` in both `Api.Host` and `Blazor.App` ships with
+`Auth:Provider=Local` (ADR-048). That means a fresh clone can authenticate
+**without any Supabase project**: `Api.Host` validates locally-signed tokens and
+Identity's `Commands/DevSignIn` endpoint provisions *and* verifies the
+`OwnerAccount` for you. Skip the whole Supabase setup below unless you're working
+on the Supabase integration itself or want production-like auth locally.
+
+Get a token directly:
+
+```bash
+curl -s -X POST http://localhost:5100/api/v1/identity/dev/sign-in \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"dev@k9crush.local","password":"anything"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])"
+```
+
+- The same email always maps to the same owner id, so you can sign in repeatedly.
+- The password is **not checked** locally — this provider is rejected at startup
+  outside Development, and the endpoint 404s unless `Auth:Provider=Local`.
+- `Login`/`Register` in `Blazor.App` use it automatically under the same setting.
+
+To use a real Supabase project locally instead, set `Auth:Provider` to `Supabase`
+for both apps (in `appsettings.Development.json` or via `dotnet user-secrets`,
+ADR-030) and follow step 2 below.
+
+## 2. Set up the Supabase project (manual, one-time) — only if `Auth:Provider=Supabase`
+
+Supabase Cloud covers Auth and Storage (ADR-005/024 — Postgres is self-hosted per ADR-047), all external managed services, nothing local to run for either. There is no *Supabase-compatible* local stand-in, so every authenticated endpoint genuinely needs a real Supabase project **when running with `Auth:Provider=Supabase`** — see the optional section above for the default development path that needs none.
 
 **Secrets go into `dotnet user-secrets`, not `appsettings.Development.json`** (ADR-030) - that file keeps `CHANGE_ME` placeholders permanently; real values live in a per-project json file outside the repo entirely (`dotnet user-secrets set "Key:SubKey" "value"` from the project directory - both `Api.Host` and `Blazor.App` already have a `UserSecretsId`, nothing to init). **User Secrets has higher config precedence than `appsettings.{Environment}.json`** - if you ever edit the json file directly and changes don't seem to take effect, run `dotnet user-secrets list` in that project directory before assuming the json file is the actual source of truth (this cost a real debugging session once already).
 
@@ -160,7 +187,7 @@ No external services needed beyond Docker (Testcontainers spins up its own dispo
   curl -X POST "$API/api/v1/identity/me/bootstrap-admin" -H "Authorization: Bearer $TOKEN"
   ```
   Self-promotes the caller to Admin - but only while zero Admins exist anywhere in the system (`BootstrapAdminHandler`). Once any Admin exists, this permanently 409s for everyone, including the one who just bootstrapped - it's a one-time setup step, not a general role-grant endpoint (there's still no way to create a `Vendor`, or a second `Admin`, via the API).
-- **No local/mock Supabase Auth.** Every authenticated endpoint needs a real Supabase Cloud project (Section 2), and Identity only learns about new users via Database Webhooks Supabase sends — which means Supabase must be able to reach wherever `Api.Host` is running (a tunnel like ngrok if running locally, not just `localhost`).
+- **No *Supabase-compatible* local stand-in for Supabase Auth.** Under `Auth:Provider=Supabase`, every authenticated endpoint needs a real Supabase Cloud project (Section 2), and Identity only learns about new users via Database Webhooks Supabase sends — which means Supabase must be able to reach wherever `Api.Host` is running (a tunnel like ngrok if running locally, not just `localhost`). The default development path avoids all of this with a local provider instead (ADR-048, Section 2 optional above).
 - **Supabase JWT validation uses a shared HS256 secret, not JWKS/OIDC discovery.** This is Supabase's default (simpler, but means the secret lives in `appsettings.Development.json` - fine for local dev, not for anything beyond it). Supabase's newer asymmetric (ES256/JWKS) signing mode is the better long-term fit and avoids that shared-secret exposure entirely, but requires explicitly enabling it in the Supabase project dashboard first - not done here.
 - **No Media module.** `AddDogProfilePhotoHandler` only stores a `MediaAssetId` reference (any `Guid` will do for testing, per the smoke test above) — there's no actual upload endpoint or Supabase Storage integration yet.
 - **Notifications covers email only, one provider (dev SMTP via smtp4dev), and 3 of the ~7 known triggers.** `NotifyOnMatch`, `NotifyOnApplicationApproved`, and `NotifyOnApplicationRejected` are built and send real SMTP in dev (ADR-027). No push notifications, no presence-based suppression (Redis is in the stack for SignalR but not consulted by Notifications yet), and production email provider (SendGrid/Postmark/SES) is still an open decision. `NotifyApplicantsOfCancellation`/`NotifyApplicantOfListingChange` (ShelterManagingListings) remain deferred — they need a same-module cascade pattern this codebase doesn't have a precedent for yet.

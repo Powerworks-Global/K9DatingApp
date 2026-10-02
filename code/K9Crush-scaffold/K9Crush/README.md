@@ -25,7 +25,7 @@ See `docs/` for the full design set:
 ## Identity and storage: Supabase
 
 Postgres is self-hosted, permanently (ADR-047) — this was Supabase-managed earlier (ADR-024) and was deliberately moved off. Supabase Cloud currently still covers two things:
-- **Auth** (Identity module, ADR-005) — there's no local/mock stand-in; every authenticated endpoint needs a real Supabase project for local dev (see `GETTING_STARTED.md` Step 2).
+- **Auth** (Identity module, ADR-005) — Supabase in every real environment. For local development the default is now `Auth:Provider=Local` (ADR-048), a Development-only stand-in that provisions/verifies the owner and mints its own token, so no Supabase project is needed (see `GETTING_STARTED.md` §2 optional).
 - **Object storage** (Media module, ADR-024).
 
 **2026-10 note:** there's an active move away from Supabase for the pieces above, though it may still end up activated specifically for production rather than removed outright — not yet a finalized decision. Treat anything in `GETTING_STARTED.md` describing Supabase setup as the current state, not a settled long-term dependency.

@@ -4,14 +4,15 @@ using System.Text.Json.Serialization;
 namespace K9Crush.Blazor.App.Services;
 
 /// <summary>
-/// Thin wrapper over Supabase's own /auth/v1 REST API. Supabase owns the
-/// entire signup/login/confirmation lifecycle (ADR-005) - this app never
-/// issues or stores credentials itself, only relays to Supabase and keeps
-/// the resulting session (see Login.razor/Register.razor).
+/// IAuthService backed by Supabase's own /auth/v1 REST API - the default in
+/// every real environment (ADR-005). Supabase owns the entire
+/// signup/login/confirmation lifecycle; this app never issues or stores
+/// credentials itself, only relays to Supabase and keeps the resulting
+/// session (see Login.razor/Register.razor).
 /// </summary>
-public sealed class SupabaseAuthService(IHttpClientFactory httpClientFactory)
+public sealed class SupabaseAuthService(IHttpClientFactory httpClientFactory) : IAuthService
 {
-    public async Task<SupabaseAuthResult> SignInWithPasswordAsync(
+    public async Task<AuthResult> SignInWithPasswordAsync(
         string email, string password, CancellationToken cancellationToken)
     {
         var client = httpClientFactory.CreateClient("SupabaseAuth");
@@ -21,7 +22,7 @@ public sealed class SupabaseAuthService(IHttpClientFactory httpClientFactory)
         return await ReadResultAsync(response, cancellationToken);
     }
 
-    public async Task<SupabaseAuthResult> SignUpAsync(
+    public async Task<AuthResult> SignUpAsync(
         string email, string password, CancellationToken cancellationToken)
     {
         var client = httpClientFactory.CreateClient("SupabaseAuth");
@@ -36,16 +37,16 @@ public sealed class SupabaseAuthService(IHttpClientFactory httpClientFactory)
         return await ReadResultAsync(response, cancellationToken);
     }
 
-    private static async Task<SupabaseAuthResult> ReadResultAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    private static async Task<AuthResult> ReadResultAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (!response.IsSuccessStatusCode)
         {
             var error = await response.Content.ReadFromJsonAsync<SupabaseAuthError>(cancellationToken: cancellationToken);
-            return SupabaseAuthResult.Failed(error?.ErrorDescription ?? error?.Msg ?? "Something went wrong - please try again.");
+            return AuthResult.Failed(error?.ErrorDescription ?? error?.Msg ?? "Something went wrong - please try again.");
         }
 
-        var session = await response.Content.ReadFromJsonAsync<SupabaseSession>(cancellationToken: cancellationToken);
-        return SupabaseAuthResult.Succeeded(session);
+        var session = await response.Content.ReadFromJsonAsync<AuthSession>(cancellationToken: cancellationToken);
+        return AuthResult.Succeeded(session);
     }
 
     private sealed record SupabaseCredentials(
@@ -56,17 +57,3 @@ public sealed class SupabaseAuthService(IHttpClientFactory httpClientFactory)
         [property: JsonPropertyName("msg")] string? Msg,
         [property: JsonPropertyName("error_description")] string? ErrorDescription);
 }
-
-public sealed record SupabaseAuthResult(bool IsSuccess, string? ErrorMessage, SupabaseSession? Session)
-{
-    public static SupabaseAuthResult Succeeded(SupabaseSession? session) => new(true, null, session);
-    public static SupabaseAuthResult Failed(string errorMessage) => new(false, errorMessage, null);
-}
-
-public sealed record SupabaseSession(
-    [property: JsonPropertyName("access_token")] string? AccessToken,
-    [property: JsonPropertyName("user")] SupabaseUser? User);
-
-public sealed record SupabaseUser(
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("email")] string? Email);
