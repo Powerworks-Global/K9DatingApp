@@ -55,7 +55,7 @@
     <!-- Caching / Real-time -->
     <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />                   <!-- [good-faith] -->
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.10" /> <!-- [good-faith, inferred same release train as JwtBearer below] -->
-    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.11" /> <!-- [good-faith, inferred same release train] -->
+    <PackageVersion Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="10.0.12" /> <!-- [good-faith, inferred same release train] -->
 
     <!-- API / OpenAPI -->
     <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.2.3" />                 <!-- [good-faith] -->
