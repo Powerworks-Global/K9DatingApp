@@ -104,7 +104,7 @@
          type, since both reference an identical generic type argument; this needs an
          actual instruction-level scan. -->
     <PackageVersion Include="Mono.Cecil" Version="0.11.6" />                          <!-- [verified - matches NetArchTest.Rules' own transitive version] -->
-    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.13.0" />             <!-- [good-faith] -->
+    <PackageVersion Include="Testcontainers.PostgreSql" Version="4.15.0" />             <!-- [good-faith] -->
     <PackageVersion Include="Testcontainers.RabbitMq" Version="3.10.0" />               <!-- [good-faith] -->
     <PackageVersion Include="Testcontainers.Redis" Version="3.10.0" />                  <!-- [good-faith] -->
     <PackageVersion Include="coverlet.collector" Version="10.0.1" />                    <!-- [verified against nuget.org's flat-container API directly] - CI code coverage collection, see tests/Directory.Build.props -->
