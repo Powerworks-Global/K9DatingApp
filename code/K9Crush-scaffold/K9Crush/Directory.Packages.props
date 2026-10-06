@@ -50,7 +50,7 @@
          decompression). Pinned explicitly here + referenced directly in
          Api.Host.csproj to force resolution to the patched version rather
          than silently carrying a vulnerable transitive dependency. -->
-    <PackageVersion Include="MessagePack" Version="2.5.302" />                          <!-- [verified - fixes GHSA-hv8m-jj95-wg3x and related] -->
+    <PackageVersion Include="MessagePack" Version="3.1.11" />                          <!-- [verified - fixes GHSA-hv8m-jj95-wg3x and related] -->
 
     <!-- Caching / Real-time -->
     <PackageVersion Include="StackExchange.Redis" Version="2.8.24" />                   <!-- [good-faith] -->
