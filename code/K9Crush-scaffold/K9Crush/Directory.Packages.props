@@ -89,7 +89,7 @@
     <PackageVersion Include="MudBlazor" Version="9.10.0" />                              <!-- [confirmed real - from dotnet add package's own restore, then reverted the CLI's file-wide reformat and re-added this one line by hand] -->
 
     <!-- Testing -->
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />               <!-- [good-faith] -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />               <!-- [good-faith] -->
     <PackageVersion Include="xunit" Version="2.9.3" />                                  <!-- [good-faith] -->
     <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />              <!-- [good-faith] -->
     <PackageVersion Include="FluentAssertions" Version="8.10.0" />                      <!-- [good-faith] -->
