@@ -83,7 +83,7 @@
          provider (SendGrid/Postmark/SES) is still an open decision - see
          docs/02-inventory-list.md - MailKit is just the SMTP client, not
          a provider commitment. -->
-    <PackageVersion Include="MailKit" Version="4.17.0" />                               <!-- [verified against nuget.org's flat-container API directly] -->
+    <PackageVersion Include="MailKit" Version="4.18.1" />                               <!-- [verified against nuget.org's flat-container API directly] -->
 
     <!-- UI (Blazor.App) - ADR-029 -->
     <PackageVersion Include="MudBlazor" Version="9.10.0" />                              <!-- [confirmed real - from dotnet add package's own restore, then reverted the CLI's file-wide reformat and re-added this one line by hand] -->
